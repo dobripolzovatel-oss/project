@@ -1,0 +1,28 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<Configuration status="WARN" packages="">
+    <Appenders>
+        <Console name="Console" target="SYSTEM_OUT">
+            <PatternLayout pattern="[%d{HH:mm:ss}] [%t/%level] %logger{36}: %msg%n"/>
+        </Console>
+    </Appenders>
+    <Loggers>
+        <!-- Общий уровень -->
+        <Root level="debug">
+            <AppenderRef ref="Console"/>
+        </Root>
+
+        <!-- Точечные категории -->
+        <Logger name="net.fabricmc.loader" level="debug" additivity="false">
+            <AppenderRef ref="Console"/>
+        </Logger>
+        <Logger name="net.minecraft" level="debug" additivity="false">
+            <AppenderRef ref="Console"/>
+        </Logger>
+        <Logger name="org.spongepowered.asm.mixin" level="debug" additivity="false">
+            <AppenderRef ref="Console"/>
+        </Logger>
+        <Logger name="seq.sequencermod" level="debug" additivity="false">
+            <AppenderRef ref="Console"/>
+        </Logger>
+    </Loggers>
+</Configuration>

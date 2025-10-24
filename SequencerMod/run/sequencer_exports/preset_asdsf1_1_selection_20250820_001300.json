@@ -1,0 +1,34 @@
+{
+  "type": "sequencer_preset",
+  "name": "preset_asdsf1_1",
+  "steps": [
+    {
+      "entityId": "minecraft:arrow",
+      "ticks": 6
+    },
+    {
+      "entityId": "minecraft:axolotl",
+      "ticks": 6
+    },
+    {
+      "entityId": "minecraft:axolotl",
+      "ticks": 6
+    },
+    {
+      "entityId": "minecraft:armor_stand",
+      "ticks": 6
+    },
+    {
+      "entityId": "minecraft:armor_stand",
+      "ticks": 6
+    },
+    {
+      "entityId": "minecraft:armor_stand",
+      "ticks": 6
+    },
+    {
+      "entityId": "minecraft:armor_stand",
+      "ticks": 6
+    }
+  ]
+}

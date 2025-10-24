@@ -1,0 +1,15 @@
+[08:12:22] [Render thread/INFO] (Minecraft) Stopping!
+[08:12:24] [Netty Server IO #1/INFO] (Minecraft) [STDOUT]: [SequenceEngine] Unmorphed on stop for Player632
+[08:12:25] [Server thread/INFO] (Minecraft) Player632 lost connection: Disconnected
+[08:12:25] [Server thread/INFO] (Minecraft) Player632 left the game
+[08:12:25] [Server thread/INFO] (Minecraft) Stopping singleplayer server as player logged out
+[08:12:25] [Server thread/INFO] (Minecraft) Stopping server
+[08:12:25] [Server thread/INFO] (Minecraft) Saving players
+[08:12:25] [Server thread/INFO] (Minecraft) Saving worlds
+[08:12:27] [Server thread/INFO] (Minecraft) Saving chunks for level 'ServerLevel[New World]'/minecraft:overworld
+[08:12:28] [Server thread/INFO] (Minecraft) Saving chunks for level 'ServerLevel[New World]'/minecraft:the_end
+[08:12:28] [Server thread/INFO] (Minecraft) Saving chunks for level 'ServerLevel[New World]'/minecraft:the_nether
+[08:12:28] [Server thread/INFO] (Minecraft) ThreadedAnvilChunkStorage (New World (679)): All chunks are saved
+[08:12:28] [Server thread/INFO] (Minecraft) ThreadedAnvilChunkStorage (DIM1): All chunks are saved
+[08:12:28] [Server thread/INFO] (Minecraft) ThreadedAnvilChunkStorage (DIM-1): All chunks are saved
+[08:12:28] [Server thread/INFO] (Minecraft) ThreadedAnvilChunkStorage: All dimensions are saved

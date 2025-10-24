@@ -1,0 +1,22 @@
+{
+  "type": "sequencer_preset",
+  "name": "preset_1_1",
+  "steps": [
+    {
+      "entityId": "minecraft:bee",
+      "ticks": 60
+    },
+    {
+      "entityId": "minecraft:bee",
+      "ticks": 60
+    },
+    {
+      "entityId": "minecraft:bee",
+      "ticks": 60
+    },
+    {
+      "entityId": "minecraft:bee",
+      "ticks": 60
+    }
+  ]
+}

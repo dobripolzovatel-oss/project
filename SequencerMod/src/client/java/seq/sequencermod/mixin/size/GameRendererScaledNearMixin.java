@@ -3,6 +3,7 @@ package seq.sequencermod.mixin.size;
 import net.fabricmc.api.EnvType;
 import net.fabricmc.api.Environment;
 import net.minecraft.block.BlockState;
+import net.minecraft.block.ShapeContext;
 import net.minecraft.client.MinecraftClient;
 import net.minecraft.client.option.Perspective;
 import net.minecraft.client.render.Camera;
@@ -10,6 +11,7 @@ import net.minecraft.client.render.GameRenderer;
 import net.minecraft.entity.player.PlayerEntity;
 import net.minecraft.util.math.BlockPos;
 import net.minecraft.util.math.Vec3d;
+import net.minecraft.util.shape.VoxelShape;
 import org.joml.Matrix4f;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.Shadow;
@@ -19,13 +21,6 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
 import seq.sequencermod.render.RenderPassFlags;
 import seq.sequencermod.size.util.SizeCalc;
 
-/**
- * Ультра-микро адаптация near/far:
- * - сверхмалый near в обычном кадре (вплоть до ~0.0010..0.0015),
- * - при прямом касании грани на 1 кадр поднимаем near до 0.035..0.050,
- * - far жёстко ограничиваем в контакте для устойчивой глубины.
- * FOV-компенсация по-прежнему НЕ касается рендера руки (hand pass).
- */
 @Environment(EnvType.CLIENT)
 @Mixin(GameRenderer.class)
 public abstract class GameRendererScaledNearMixin {
@@ -33,28 +28,16 @@ public abstract class GameRendererScaledNearMixin {
     @Shadow private Camera camera;
 
     private static float minNearForScale(float s) {
-        // Уточнённый минимум near под экстремальные масштабы
-        if (s < 1.0e-5f) return 0.0010f; // ultra-ultra-tiny
-        if (s < 1.0e-4f) return 0.0015f; // ultra-tiny
+        if (s < 1.0e-5f) return 0.0010f;
+        if (s < 1.0e-4f) return 0.0015f;
         if (s < 5.0e-4f) return 0.0020f;
-        if (s < 1.0e-3f) return 0.0025f; // micro
+        if (s < 1.0e-3f) return 0.0025f;
         if (s < 1.0e-2f) return 0.0045f;
         if (s < 0.10f)    return 0.0080f;
         return 0.0100f;
     }
 
-    private static float limitFarForNear(float far, float near) {
-        // Чем выше near в контакте — тем меньше допускаем far на кадр
-        if (near >= 0.0500f) return Math.min(far, 48.0f);
-        if (near >= 0.0350f) return Math.min(far, 64.0f);
-        if (near >= 0.0250f) return Math.min(far, 96.0f);
-        if (near >= 0.0180f) return Math.min(far, 128.0f);
-        if (near <  0.0030f) return Math.min(far, 96.0f);   // очень малый near — тоже поджимаем
-        if (near <  0.0045f) return Math.min(far, 128.0f);
-        if (near <  0.0085f) return Math.min(far, 768.0f);
-        if (near <  0.0120f) return Math.min(far, 1024.0f);
-        return far;
-    }
+    // УБРАНО: limitFarForNear — больше не урезаем far, оставляем ванильный view distance.
 
     @Inject(method = "getBasicProjectionMatrix(D)Lorg/joml/Matrix4f;", at = @At("HEAD"), cancellable = true)
     private void sequencer$scaledNearAndFov(double fovDegOriginal, CallbackInfoReturnable<Matrix4f> cir) {
@@ -75,12 +58,12 @@ public abstract class GameRendererScaledNearMixin {
         boolean firstPerson = persp != null && persp.isFirstPerson();
 
         float near = vanillaNear;
-        float far  = ((GameRenderer)(Object)this).getViewDistance();
+        float far  = ((GameRenderer)(Object)this).getViewDistance(); // НЕ урезаем
 
-        // Мягкая FOV-компенсация только для мира (не для руки)
+        // Мягкая FOV‑компенсация только для мира (не для руки)
         double fovDeg = fovDegOriginal;
         if (firstPerson && !RenderPassFlags.isHand()) {
-            double mult = 1.0 - 0.18 * (1.0 - Math.sqrt(s)); // 1..~0.82
+            double mult = 1.0 - 0.18 * (1.0 - Math.sqrt(s));
             if (mult < 0.82) mult = 0.82;
             fovDeg = fovDegOriginal * mult;
         }
@@ -91,41 +74,57 @@ public abstract class GameRendererScaledNearMixin {
             float minNear = minNearForScale(s);
             near = Math.max(minNear, Math.min(vanillaNear, candidate));
 
-            // Контакт-адаптация near (позиция КАМЕРЫ)
+            // Контакт‑адаптация near только если камера действительно ВНУТРИ коллизионного shape твердого блока.
             Vec3d camPos = (this.camera != null ? this.camera.getPos() : p.getEyePos());
             BlockPos bp = BlockPos.ofFloored(camPos);
             BlockState st = p.getWorld().getBlockState(bp);
 
+            // Игнорируем воздух и блоки без коллизии (трава/листья без collision).
             if (!st.isAir()) {
-                double fx = camPos.x - bp.getX();
-                double fy = camPos.y - bp.getY();
-                double fz = camPos.z - bp.getZ();
-                double dx = Math.min(fx, 1.0 - fx);
-                double dy = Math.min(fy, 1.0 - fy);
-                double dz = Math.min(fz, 1.0 - fz);
-                double minEdge = Math.min(dx, Math.min(dy, dz));
+                VoxelShape shape = st.getCollisionShape(p.getWorld(), bp, ShapeContext.absent());
+                if (!shape.isEmpty()) {
+                    // Границы объединённого shape в мировых координатах
+                    var bb = shape.getBoundingBox();
+                    double minX = bp.getX() + bb.minX;
+                    double minY = bp.getY() + bb.minY;
+                    double minZ = bp.getZ() + bb.minZ;
+                    double maxX = bp.getX() + bb.maxX;
+                    double maxY = bp.getY() + bb.maxY;
+                    double maxZ = bp.getZ() + bb.maxZ;
 
-                // Для экстремально маленьких масштабов поднимаем near сильнее в момент касания
-                if (minEdge < 0.00010) {                          // практически в грани
-                    near = Math.max(near, firstPerson ? 0.050f : 0.055f);
-                } else if (minEdge < 0.00030) {
-                    near = Math.max(near, firstPerson ? 0.040f : 0.045f);
-                } else if (minEdge < 0.00080) {
-                    near = Math.max(near, firstPerson ? 0.030f : 0.035f);
-                } else if (minEdge < 0.00150) {
-                    near = Math.max(near, firstPerson ? 0.020f : 0.025f);
-                } else if (minEdge < 0.00300) {
-                    near = Math.max(near, firstPerson ? 0.0150f : 0.0180f);
-                } else if (minEdge < 0.00450) {
-                    near = Math.max(near, firstPerson ? 0.0125f : 0.0150f);
+                    // Небольшой eps, чтобы не триггериться "над гранью"
+                    final double eps = 1.0e-5;
+
+                    boolean insideX = camPos.x > minX + eps && camPos.x < maxX - eps;
+                    boolean insideY = camPos.y > minY + eps && camPos.y < maxY - eps;
+                    boolean insideZ = camPos.z > minZ + eps && camPos.z < maxZ - eps;
+
+                    if (insideX && insideY && insideZ) {
+                        double dx = Math.min(camPos.x - minX, maxX - camPos.x);
+                        double dy = Math.min(camPos.y - minY, maxY - camPos.y);
+                        double dz = Math.min(camPos.z - minZ, maxZ - camPos.z);
+                        double minEdge = Math.min(dx, Math.min(dy, dz));
+
+                        // Поднимаем near мягко только при реальном "внутри"
+                        if (minEdge < 0.00010) {
+                            near = Math.max(near, firstPerson ? 0.050f : 0.055f);
+                        } else if (minEdge < 0.00030) {
+                            near = Math.max(near, firstPerson ? 0.040f : 0.045f);
+                        } else if (minEdge < 0.00080) {
+                            near = Math.max(near, firstPerson ? 0.030f : 0.035f);
+                        } else if (minEdge < 0.00150) {
+                            near = Math.max(near, firstPerson ? 0.020f : 0.025f);
+                        } else if (minEdge < 0.00300) {
+                            near = Math.max(near, firstPerson ? 0.0150f : 0.0180f);
+                        } else if (minEdge < 0.00450) {
+                            near = Math.max(near, firstPerson ? 0.0125f : 0.0150f);
+                        }
+                    }
                 }
             }
-
-            // Поддерживаем устойчивую глубину
-            far = limitFarForNear(far, near);
         }
 
-        // Матрица проекции
+        // Матрица проекции (far — ванильный, без урезания)
         int fbw = mc.getWindow().getFramebufferWidth();
         int fbh = mc.getWindow().getFramebufferHeight();
         float aspect = (fbw > 0 && fbh > 0) ? (float) fbw / (float) fbh : 1.0f;

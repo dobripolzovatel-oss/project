@@ -54,7 +54,8 @@ public abstract class PlayerEyeHeightClientMixin {
         float eye = ratio * h;
 
         // Мягкие зазоры от пола/потолка: в долях от h + минимальный eps
-        float floorEps = Math.max(WhiteHitboxScale.EPS_HEIGHT, 0.005f * h); // ~0.5% h
+        final float ABS_FLOOR_CLEARANCE = 0.02f;
+        float floorEps = Math.max(ABS_FLOOR_CLEARANCE, Math.max(WhiteHitboxScale.EPS_HEIGHT, 0.005f * h));
         float topEps   = Math.max(WhiteHitboxScale.EPS_HEIGHT, 0.01f  * h); // ~1% h
 
         // Жёстко зажимаем внутрь AABB

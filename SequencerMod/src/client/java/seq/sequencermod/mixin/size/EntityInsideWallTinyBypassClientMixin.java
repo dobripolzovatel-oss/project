@@ -14,7 +14,7 @@ import seq.sequencermod.size.util.SizeCalc;
 @Mixin(Entity.class)
 public abstract class EntityInsideWallTinyBypassClientMixin {
     // Порог высоты хитбокса, ниже которого overlay отключаем
-    private static final float TINY_BYPASS_HEIGHT = 0.08f; // изменяй при необходимости: 0.06..0.10
+    private static final float TINY_BYPASS_HEIGHT = 0.12f; // изменяй при необходимости: 0.06..0.10
     private static final boolean DEBUG_LOG = false;
     private static long lastLogNs = 0;
 

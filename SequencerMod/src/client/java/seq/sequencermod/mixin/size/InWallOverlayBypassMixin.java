@@ -24,7 +24,7 @@ import seq.sequencermod.size.util.SizeCalc;
 @Mixin(InGameOverlayRenderer.class)
 public abstract class InWallOverlayBypassMixin {
 
-    private static final float TINY_BYPASS_HEIGHT = 0.10f; // 0.06..0.10 подстрой по желанию
+    private static final float TINY_BYPASS_HEIGHT = 0.12f; // 0.06..0.10 подстрой по желанию
 
     private static boolean shouldBypass(PlayerEntity p) {
         if (p == null) return false;

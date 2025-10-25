@@ -14,8 +14,8 @@ import seq.sequencermod.size.net.SizePackets;
 public final class SizeCommand {
     private SizeCommand(){}
 
-    private static final float MIN_W = 0.000001f;
-    private static final float MIN_H = 0.000001f;
+    private static final float MIN_W = 0.00001f;
+    private static final float MIN_H = 0.00001f;
 
     public static void register() {
         CommandRegistrationCallback.EVENT.register((dispatcher, ra, env) -> {

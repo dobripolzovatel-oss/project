@@ -1,6 +1,8 @@
 package seq.sequencermod.core;
 
 import com.mojang.brigadier.CommandDispatcher;
+import seq.sequencermod.size.command.SizeCommand;              // + добавить
+import seq.sequencermod.size.net.SizePackets;
 import com.mojang.brigadier.arguments.StringArgumentType;
 import net.fabricmc.api.ModInitializer;
 import net.fabricmc.fabric.api.command.v2.CommandRegistrationCallback;
@@ -45,6 +47,7 @@ public final class SequencerMod implements ModInitializer {
 
 		// 1) Секвенции
 		SequenceRegistry.init();
+		SizeCommand.register();
 		SequenceJsonLoader.init();
 
 		// 2) Сеть
@@ -59,6 +62,7 @@ public final class SequencerMod implements ModInitializer {
 		// 5) GUI data клиенту при входе
 		ServerPlayConnectionEvents.JOIN.register((handler, sender, server) -> {
 			SequencerNetworking.sendSequencesToClient(handler.player);
+			SizePackets.sendAllTo(handler.player);
 		});
 
 		// 6) Очистка при выходе

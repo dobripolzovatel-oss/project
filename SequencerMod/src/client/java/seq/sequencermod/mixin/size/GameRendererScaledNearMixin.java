@@ -57,6 +57,12 @@ public abstract class GameRendererScaledNearMixin {
         Perspective persp = mc.options != null ? mc.options.getPerspective() : Perspective.FIRST_PERSON;
         boolean firstPerson = persp != null && persp.isFirstPerson();
 
+        // Для «почти ванильного» роста оставляем стандартную реализацию без нашего вмешательства,
+        // чтобы исключить возможные артефакты небосклона от мелких округлений.
+        if (s >= 0.99f) {
+            return; // не вызываем setReturnValue -> отработает метод GameRenderer как обычно
+        }
+
     float near = vanillaNear;
     float far  = ((GameRenderer)(Object)this).getViewDistance();
 

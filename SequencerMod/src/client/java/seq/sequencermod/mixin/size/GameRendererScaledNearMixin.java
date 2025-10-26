@@ -57,8 +57,8 @@ public abstract class GameRendererScaledNearMixin {
         Perspective persp = mc.options != null ? mc.options.getPerspective() : Perspective.FIRST_PERSON;
         boolean firstPerson = persp != null && persp.isFirstPerson();
 
-        float near = vanillaNear;
-        float far  = ((GameRenderer)(Object)this).getViewDistance(); // НЕ урезаем
+    float near = vanillaNear;
+    float far  = ((GameRenderer)(Object)this).getViewDistance();
 
         // Мягкая FOV‑компенсация только для мира (не для руки)
         double fovDeg = fovDegOriginal;
@@ -124,7 +124,21 @@ public abstract class GameRendererScaledNearMixin {
             }
         }
 
-        // Матрица проекции (far — ванильный, без урезания)
+        // Слишком маленький near резко портит глубину: удерживаем разумное соотношение far/near.
+    final float maxDepthRatio = 120000.0f; // ≈24x ванильного 5120 — достаточно для микро-игроков без полос на небе
+    final float minFarClamp   = 64.0f;     // нижняя граница дальности (4 чанка)
+        if (near > 0.0f) {
+            float ratio = far / near;
+            if (ratio > maxDepthRatio) {
+                float clampedFar = near * maxDepthRatio;
+                if (clampedFar < minFarClamp) clampedFar = minFarClamp;
+                if (clampedFar < far) {
+                    far = clampedFar;
+                }
+            }
+        }
+
+    // Матрица проекции (far может быть мягко урезан для стабильной глубины)
         int fbw = mc.getWindow().getFramebufferWidth();
         int fbh = mc.getWindow().getFramebufferHeight();
         float aspect = (fbw > 0 && fbh > 0) ? (float) fbw / (float) fbh : 1.0f;

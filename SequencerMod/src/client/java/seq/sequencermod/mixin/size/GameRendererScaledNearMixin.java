@@ -28,12 +28,12 @@ public abstract class GameRendererScaledNearMixin {
     @Shadow private Camera camera;
 
     private static float minNearForScale(float s) {
-        if (s < 1.0e-5f) return 0.0010f;
-        if (s < 1.0e-4f) return 0.0015f;
-        if (s < 5.0e-4f) return 0.0020f;
-        if (s < 1.0e-3f) return 0.0025f;
-        if (s < 1.0e-2f) return 0.0045f;
-        if (s < 0.10f)    return 0.0080f;
+        if (s < 1.0e-5f) return 0.0035f;
+        if (s < 1.0e-4f) return 0.0040f;
+        if (s < 5.0e-4f) return 0.0045f;
+        if (s < 1.0e-3f) return 0.0050f;
+        if (s < 1.0e-2f) return 0.0065f;
+        if (s < 0.10f)    return 0.0085f;
         return 0.0100f;
     }
 

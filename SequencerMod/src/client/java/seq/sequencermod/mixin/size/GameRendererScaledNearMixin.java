@@ -125,20 +125,15 @@ public abstract class GameRendererScaledNearMixin {
         }
 
         // Слишком маленький near резко портит глубину: удерживаем разумное соотношение far/near.
-    final float maxDepthRatio = 120000.0f; // ≈24x ванильного 5120 — достаточно для микро-игроков без полос на небе
-    final float minFarClamp   = 64.0f;     // нижняя граница дальности (4 чанка)
+        final float maxDepthRatio = 120000.0f; // ≈24x ванильного 5120 — хватает для микро-хитбоксов без полос «горизонта»
         if (near > 0.0f) {
-            float ratio = far / near;
-            if (ratio > maxDepthRatio) {
-                float clampedFar = near * maxDepthRatio;
-                if (clampedFar < minFarClamp) clampedFar = minFarClamp;
-                if (clampedFar < far) {
-                    far = clampedFar;
-                }
+            float minNearFromDepth = far / maxDepthRatio;
+            if (near < minNearFromDepth) {
+                near = minNearFromDepth;
             }
         }
 
-    // Матрица проекции (far может быть мягко урезан для стабильной глубины)
+        // Матрица проекции (far оставляем ванильным; near повышаем при необходимости для глубины)
         int fbw = mc.getWindow().getFramebufferWidth();
         int fbh = mc.getWindow().getFramebufferHeight();
         float aspect = (fbw > 0 && fbh > 0) ? (float) fbw / (float) fbh : 1.0f;

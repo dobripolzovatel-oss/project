@@ -1,4 +1,4 @@
-package seq.sequencermod.mixin.size;
+gpackage seq.sequencermod.mixin.size;
 
 import net.fabricmc.api.EnvType;
 import net.fabricmc.api.Environment;
@@ -57,9 +57,8 @@ public abstract class GameRendererScaledNearMixin {
         Perspective persp = mc.options != null ? mc.options.getPerspective() : Perspective.FIRST_PERSON;
         boolean firstPerson = persp != null && persp.isFirstPerson();
 
-        // Для «почти ванильного» роста оставляем стандартную реализацию без нашего вмешательства,
-        // чтобы исключить возможные артефакты небосклона от мелких округлений.
-        if (s >= 0.99f) {
+        // Для нормальных/крупных размеров оставляем стандартную проекцию, вмешиваемся только при tiny-росте.
+        if (s >= 0.50f) {
             return; // не вызываем setReturnValue -> отработает метод GameRenderer как обычно
         }
 

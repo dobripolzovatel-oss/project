@@ -2,10 +2,14 @@ package seq.sequencermod.mixin.size;
 
 import net.fabricmc.api.EnvType;
 import net.fabricmc.api.Environment;
+import net.minecraft.block.BlockState;
 import net.minecraft.client.MinecraftClient;
 import net.minecraft.entity.EntityDimensions;
 import net.minecraft.entity.EntityPose;
 import net.minecraft.entity.player.PlayerEntity;
+import net.minecraft.util.math.BlockPos;
+import net.minecraft.util.math.Direction;
+import net.minecraft.util.shape.VoxelShape;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
@@ -67,6 +71,58 @@ public abstract class PlayerEyeHeightClientMixin {
         return Math.max(base, relativeMin);
     }
 
+    /**
+     * Вычисляет минимальную высоту глаз относительно позиции игрока (player.getY()),
+     * основанную на реальной геометрии блока коллизии под ногами игрока.
+     * 
+     * Это гарантирует, что камера находится выше верхней границы блока коллизии
+     * как минимум на clearance блоков, независимо от размера белого AABB.
+     * 
+     * @param p PlayerEntity
+     * @param clearance Минимальный зазор над верхней поверхностью блока (в блоках)
+     * @return Минимальная высота глаз относительно player.getY()
+     */
+    private static float worldClearanceEye(PlayerEntity p, float clearance) {
+        if (p == null || p.getWorld() == null) return 0f;
+        
+        // Позиция ног игрока (нижняя граница AABB)
+        double playerY = p.getY();
+        
+        // Блок, в котором находятся ноги игрока
+        BlockPos feetPos = BlockPos.ofFloored(p.getX(), playerY, p.getZ());
+        
+        // Получаем форму коллизии блока под ногами (кешируем BlockState)
+        BlockState feetState = p.getWorld().getBlockState(feetPos);
+        VoxelShape collisionShape = feetState.getCollisionShape(p.getWorld(), feetPos);
+        
+        // Если блок имеет коллизию, берём верхнюю границу
+        double blockTopY;
+        if (!collisionShape.isEmpty()) {
+            // Верхняя граница коллизионной формы в мировых координатах
+            blockTopY = feetPos.getY() + collisionShape.getMax(Direction.Axis.Y);
+        } else {
+            // Нет коллизии в текущем блоке - проверяем блок ниже
+            BlockPos belowPos = feetPos.down();
+            BlockState belowState = p.getWorld().getBlockState(belowPos);
+            VoxelShape belowShape = belowState.getCollisionShape(p.getWorld(), belowPos);
+            
+            if (!belowShape.isEmpty()) {
+                blockTopY = belowPos.getY() + belowShape.getMax(Direction.Axis.Y);
+            } else {
+                // Нет твёрдой поверхности - возвращаем 0 (не применяем ограничение)
+                return 0f;
+            }
+        }
+        
+        // Минимальная мировая Y для глаз = верх блока + клиренс
+        double minWorldEyeY = blockTopY + clearance;
+        
+        // Преобразуем в относительную высоту от playerY
+        float worldLower = (float) (minWorldEyeY - playerY);
+        
+        return Math.max(0f, worldLower);
+    }
+
     // getActiveEyeHeight(Lnet/minecraft/entity/EntityPose;Lnet/minecraft/entity/EntityDimensions;)F
     @Inject(
             method = "getActiveEyeHeight(Lnet/minecraft/entity/EntityPose;Lnet/minecraft/entity/EntityDimensions;)F",
@@ -97,28 +153,40 @@ public abstract class PlayerEyeHeightClientMixin {
         // Обычно зажимаем внутрь AABB
         float minEye = floorEps;
         float maxEye = Math.max(WhiteHitboxScale.EPS_HEIGHT, h - topEps);
+        
+        // Вычисляем мировой нижний предел на основе реальной геометрии блока
+        float worldLower = worldClearanceEye(player, MIN_FP_CLEARANCE);
+        
         if (minEye > maxEye) {
             // Ультра-малый AABB: слои пересеклись.
-            // Вместо центрирования используем абсолютный минимум,
-            // который может быть выше h — это нормально и убирает "подземный" вид.
-            float absMin = clientMinAbsEye(h, pose);
-            // Применяем MIN_FP_CLEARANCE для гарантии, что камера выше near plane.
+            // Вместо центрирования используем максимум из абсолютного минимума,
+            // MIN_FP_CLEARANCE и worldLower.
             // НЕ зажимаем до maxEye: при экстремально малых размерах камера может быть выше белого бокса.
-            eye = Math.max(absMin, MIN_FP_CLEARANCE);
+            float absMin = clientMinAbsEye(h, pose);
+            float minRequired = Math.max(absMin, MIN_FP_CLEARANCE);
+            eye = Math.max(minRequired, worldLower);
             
             if (DebugTaps.active.get()) {
-                DebugTaps.logf("[PlayerEyeHeightClient] ULTRA-TINY: h=%.6f, pose=%s, absMin=%.6f, eye=%.6f",
-                        h, pose, absMin, eye);
+                DebugTaps.logf("[PlayerEyeHeightClient] ULTRA-TINY: h=%.6f, pose=%s, absMin=%.6f, worldLower=%.6f, eye=%.6f",
+                        h, pose, absMin, worldLower, eye);
             }
         } else {
-            // Нормальный случай: зажимаем внутрь AABB, но с учётом MIN_FP_CLEARANCE.
-            // Это гарантирует, что даже при малых (но не коллапсированных) AABB камера останется выше near plane.
-            float lower = Math.max(minEye, MIN_FP_CLEARANCE);
-            eye = Math.max(lower, Math.min(maxEye, eye));
+            // Нормальный случай: зажимаем внутрь AABB, но с учётом MIN_FP_CLEARANCE и worldLower.
+            // Если worldLower требует eye > maxEye, разрешаем камере выйти выше AABB.
+            float aabbLower = Math.max(minEye, MIN_FP_CLEARANCE);
+            float lower = Math.max(aabbLower, worldLower);
+            
+            if (lower <= maxEye) {
+                // Можем вместить в AABB
+                eye = Math.max(lower, Math.min(maxEye, eye));
+            } else {
+                // worldLower требует выйти выше AABB - разрешаем это
+                eye = Math.max(lower, eye);
+            }
             
             if (DebugTaps.active.get()) {
-                DebugTaps.logf("[PlayerEyeHeightClient] NORMAL: h=%.6f, pose=%s, lower=%.6f, maxEye=%.6f, eye=%.6f",
-                        h, pose, lower, maxEye, eye);
+                DebugTaps.logf("[PlayerEyeHeightClient] NORMAL: h=%.6f, pose=%s, lower=%.6f, maxEye=%.6f, worldLower=%.6f, eye=%.6f",
+                        h, pose, lower, maxEye, worldLower, eye);
             }
         }
 

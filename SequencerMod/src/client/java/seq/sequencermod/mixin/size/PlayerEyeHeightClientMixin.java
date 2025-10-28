@@ -38,15 +38,19 @@ public abstract class PlayerEyeHeightClientMixin {
      * Копирует логику baseMinAbsEye из PlayerStandingEyeHeightBypassMixin.
      * Для ультра-малых хитбоксов (h < 0.002f) возвращает достаточную высоту,
      * чтобы камера не оказалась внутри блока пола.
+     * 
+     * Значения согласованы с серверной логикой и подобраны эмпирически
+     * для гарантии видимости при экстремально малых размерах.
      */
     private static float clientMinAbsEye(float h, EntityPose pose) {
-        // Базовые абсолютные пороги для разных диапазонов высоты
-        float base = (h < 0.002f) ? 0.0045f :
-                     (h < 0.010f) ? 0.0030f :
-                     (h < 0.050f) ? 0.0020f :
-                                     0.0000f;
+        // Базовые абсолютные пороги (в метрах) для разных диапазонов высоты.
+        // Значения совпадают с PlayerStandingEyeHeightBypassMixin#baseMinAbsEye.
+        float base = (h < 0.002f) ? 0.0045f :  // 4.5 мм для микро-размеров
+                     (h < 0.010f) ? 0.0030f :  // 3.0 мм для очень малых
+                     (h < 0.050f) ? 0.0020f :  // 2.0 мм для малых
+                                     0.0000f;   // 0 для нормальных (пропорция преобладает)
 
-        // Корректировка для специальных поз
+        // Корректировка для специальных поз (согласовано с сервером)
         if (pose == EntityPose.SWIMMING || pose == EntityPose.FALL_FLYING) base *= 0.85f;
         else if (pose == EntityPose.SLEEPING) base *= 0.5f;
 

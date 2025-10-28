@@ -2,6 +2,7 @@ package seq.sequencermod.mixin.size;
 
 import net.fabricmc.api.EnvType;
 import net.fabricmc.api.Environment;
+import net.minecraft.block.BlockState;
 import net.minecraft.client.MinecraftClient;
 import net.minecraft.entity.EntityDimensions;
 import net.minecraft.entity.EntityPose;
@@ -91,7 +92,7 @@ public abstract class PlayerEyeHeightClientMixin {
         BlockPos feetPos = BlockPos.ofFloored(p.getX(), playerY, p.getZ());
         
         // Получаем форму коллизии блока под ногами (кешируем BlockState)
-        var feetState = p.getWorld().getBlockState(feetPos);
+        BlockState feetState = p.getWorld().getBlockState(feetPos);
         VoxelShape collisionShape = feetState.getCollisionShape(p.getWorld(), feetPos);
         
         // Если блок имеет коллизию, берём верхнюю границу
@@ -102,7 +103,7 @@ public abstract class PlayerEyeHeightClientMixin {
         } else {
             // Нет коллизии в текущем блоке - проверяем блок ниже
             BlockPos belowPos = feetPos.down();
-            var belowState = p.getWorld().getBlockState(belowPos);
+            BlockState belowState = p.getWorld().getBlockState(belowPos);
             VoxelShape belowShape = belowState.getCollisionShape(p.getWorld(), belowPos);
             
             if (!belowShape.isEmpty()) {

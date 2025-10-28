@@ -82,8 +82,10 @@ public abstract class PlayerEyeHeightClientMixin {
         if (player == null || player.getWorld() == null) return 0.0f;
         
         // Позиция блока под игроком (на котором стоим)
-        // getBlockPos() возвращает блок, содержащий центр игрока, поэтому берём блок ниже
-        BlockPos pos = player.getBlockPos().down();
+        // getBlockPos() возвращает блок, содержащий позицию игрока
+        // Для надёжности берём блок ниже позиции ног с небольшим смещением
+        double feetY = player.getY();
+        BlockPos pos = BlockPos.ofFloored(player.getX(), feetY - 0.1, player.getZ());
         BlockState state = player.getWorld().getBlockState(pos);
         
         // Получаем форму коллизии блока
@@ -96,15 +98,12 @@ public abstract class PlayerEyeHeightClientMixin {
         // Верхняя граница коллизии блока (относительно блока, от 0 до 1 для полного блока)
         double collisionTop = shape.getMax(net.minecraft.util.math.Direction.Axis.Y);
         
-        // Нижняя граница игрока (ноги) в мировых координатах
-        double playerFeetY = player.getY();
-        
         // Верх коллизии блока в мировых координатах
         double blockCollisionTop = pos.getY() + collisionTop;
         
         // Требуемая высота глаз = (верх коллизии - ноги игрока) + клиренс
-        // Если игрок стоит точно на блоке, playerFeetY должен быть примерно равен blockCollisionTop
-        float eyeFromFeet = (float)(blockCollisionTop - playerFeetY) + clearance;
+        // Когда игрок стоит на блоке, playerFeetY равен blockCollisionTop
+        float eyeFromFeet = (float)(blockCollisionTop - feetY) + clearance;
         
         // Не возвращаем отрицательные значения (игрок может быть чуть выше блока при прыжке)
         return Math.max(0.0f, eyeFromFeet);

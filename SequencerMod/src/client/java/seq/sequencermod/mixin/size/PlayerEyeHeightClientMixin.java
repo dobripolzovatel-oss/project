@@ -14,8 +14,10 @@ import seq.sequencermod.size.util.WhiteHitboxScale;
 
 /**
  * CLIENT: высота глаз локального игрока в ПЕРВОМ лице = пропорция от высоты БЕЛОГО хитбокса (текущего AABB).
- * Всегда зажимаем eye внутри AABB: [пол + eps; потолок - eps].
- * Никаких абсолютных нижних порогов, чтобы не "вылетать" над белым боксом на ультра-микро.
+ * Обычно зажимаем eye внутри AABB: [пол + eps; потолок - eps].
+ * При экстремально малых размерах (h < 0.002f) разрешаем камере быть выше AABB,
+ * используя абсолютный минимум (аналогично серверной логике PlayerStandingEyeHeightBypassMixin),
+ * чтобы избежать "подземного" вида.
  */
 @Environment(EnvType.CLIENT)
 @Mixin(value = PlayerEntity.class, priority = 1000)
@@ -29,6 +31,32 @@ public abstract class PlayerEyeHeightClientMixin {
             case CROUCHING -> 0.90f;
             default -> 0.90f;
         };
+    }
+
+    /**
+     * Минимальная абсолютная высота глаз для клиента (в метрах/блоках).
+     * Копирует логику baseMinAbsEye из PlayerStandingEyeHeightBypassMixin.
+     * Для ультра-малых хитбоксов (h < 0.002f) возвращает достаточную высоту,
+     * чтобы камера не оказалась внутри блока пола.
+     * 
+     * Значения согласованы с серверной логикой и подобраны эмпирически
+     * для гарантии видимости при экстремально малых размерах.
+     */
+    private static float clientMinAbsEye(float h, EntityPose pose) {
+        // Базовые абсолютные пороги (в метрах) для разных диапазонов высоты.
+        // Значения совпадают с PlayerStandingEyeHeightBypassMixin#baseMinAbsEye.
+        float base = (h < 0.002f) ? 0.0045f :  // 4.5 мм для микро-размеров
+                     (h < 0.010f) ? 0.0030f :  // 3.0 мм для очень малых
+                     (h < 0.050f) ? 0.0020f :  // 2.0 мм для малых
+                                     0.0000f;   // 0 для нормальных (пропорция преобладает)
+
+        // Корректировка для специальных поз (согласовано с сервером)
+        if (pose == EntityPose.SWIMMING || pose == EntityPose.FALL_FLYING) base *= 0.85f;
+        else if (pose == EntityPose.SLEEPING) base *= 0.5f;
+
+        // Относительный минимум — 15% от высоты
+        float relativeMin = h * 0.15f;
+        return Math.max(base, relativeMin);
     }
 
     // getActiveEyeHeight(Lnet/minecraft/entity/EntityPose;Lnet/minecraft/entity/EntityDimensions;)F
@@ -58,13 +86,15 @@ public abstract class PlayerEyeHeightClientMixin {
         float floorEps = Math.max(ABS_FLOOR_CLEARANCE, Math.max(WhiteHitboxScale.EPS_HEIGHT, 0.005f * h));
         float topEps   = Math.max(WhiteHitboxScale.EPS_HEIGHT, 0.01f  * h); // ~1% h
 
-        // Жёстко зажимаем внутрь AABB
+        // Обычно зажимаем внутрь AABB
         float minEye = floorEps;
         float maxEye = Math.max(WhiteHitboxScale.EPS_HEIGHT, h - topEps);
         if (minEye > maxEye) {
-            // На экстремально маленьких h слои могут пересечься — сведём eye к центру
-            float mid = h * 0.5f;
-            eye = Math.max(WhiteHitboxScale.EPS_HEIGHT, Math.min(h - WhiteHitboxScale.EPS_HEIGHT, mid));
+            // Ультра-малый AABB: слои пересеклись.
+            // Вместо центрирования используем абсолютный минимум,
+            // который может быть выше h — это нормально и убирает "подземный" вид.
+            eye = clientMinAbsEye(h, pose);
+            // НЕ зажимаем до maxEye, чтобы камера могла быть выше белого бокса
         } else {
             eye = Math.max(minEye, Math.min(maxEye, eye));
         }

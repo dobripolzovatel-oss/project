@@ -90,9 +90,9 @@ public abstract class PlayerEyeHeightClientMixin {
         // Блок, в котором находятся ноги игрока
         BlockPos feetPos = BlockPos.ofFloored(p.getX(), playerY, p.getZ());
         
-        // Получаем форму коллизии блока под ногами
-        VoxelShape collisionShape = p.getWorld().getBlockState(feetPos)
-                .getCollisionShape(p.getWorld(), feetPos);
+        // Получаем форму коллизии блока под ногами (кешируем BlockState)
+        var feetState = p.getWorld().getBlockState(feetPos);
+        VoxelShape collisionShape = feetState.getCollisionShape(p.getWorld(), feetPos);
         
         // Если блок имеет коллизию, берём верхнюю границу
         double blockTopY;
@@ -102,8 +102,8 @@ public abstract class PlayerEyeHeightClientMixin {
         } else {
             // Нет коллизии в текущем блоке - проверяем блок ниже
             BlockPos belowPos = feetPos.down();
-            VoxelShape belowShape = p.getWorld().getBlockState(belowPos)
-                    .getCollisionShape(p.getWorld(), belowPos);
+            var belowState = p.getWorld().getBlockState(belowPos);
+            VoxelShape belowShape = belowState.getCollisionShape(p.getWorld(), belowPos);
             
             if (!belowShape.isEmpty()) {
                 blockTopY = belowPos.getY() + belowShape.getMax(Direction.Axis.Y);
@@ -162,7 +162,8 @@ public abstract class PlayerEyeHeightClientMixin {
             // MIN_FP_CLEARANCE и worldLower.
             // НЕ зажимаем до maxEye: при экстремально малых размерах камера может быть выше белого бокса.
             float absMin = clientMinAbsEye(h, pose);
-            eye = Math.max(Math.max(absMin, MIN_FP_CLEARANCE), worldLower);
+            float minRequired = Math.max(absMin, MIN_FP_CLEARANCE);
+            eye = Math.max(minRequired, worldLower);
             
             if (DebugTaps.active.get()) {
                 DebugTaps.logf("[PlayerEyeHeightClient] ULTRA-TINY: h=%.6f, pose=%s, absMin=%.6f, worldLower=%.6f, eye=%.6f",
@@ -171,7 +172,8 @@ public abstract class PlayerEyeHeightClientMixin {
         } else {
             // Нормальный случай: зажимаем внутрь AABB, но с учётом MIN_FP_CLEARANCE и worldLower.
             // Если worldLower требует eye > maxEye, разрешаем камере выйти выше AABB.
-            float lower = Math.max(Math.max(minEye, MIN_FP_CLEARANCE), worldLower);
+            float aabbLower = Math.max(minEye, MIN_FP_CLEARANCE);
+            float lower = Math.max(aabbLower, worldLower);
             
             if (lower <= maxEye) {
                 // Можем вместить в AABB

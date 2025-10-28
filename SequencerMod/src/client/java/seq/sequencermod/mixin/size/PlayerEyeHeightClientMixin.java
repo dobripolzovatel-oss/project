@@ -23,6 +23,13 @@ import seq.sequencermod.size.util.WhiteHitboxScale;
 @Mixin(value = PlayerEntity.class, priority = 1000)
 public abstract class PlayerEyeHeightClientMixin {
 
+    /**
+     * Минимальный клиренс для first-person камеры над поверхностью блока.
+     * ~6 см (0.06 блока), что выше типичной near plane (~0.05 блока).
+     * Гарантирует, что камера не окажется внутри геометрии пола при экстремально малых размерах.
+     */
+    private static final float MIN_FP_CLEARANCE = 0.06f;
+
     private static float ratioForPose(EntityPose pose) {
         if (pose == null) return 0.90f;
         return switch (pose) {
@@ -93,10 +100,15 @@ public abstract class PlayerEyeHeightClientMixin {
             // Ультра-малый AABB: слои пересеклись.
             // Вместо центрирования используем абсолютный минимум,
             // который может быть выше h — это нормально и убирает "подземный" вид.
-            eye = clientMinAbsEye(h, pose);
-            // НЕ зажимаем до maxEye, чтобы камера могла быть выше белого бокса
+            float absMin = clientMinAbsEye(h, pose);
+            // Применяем MIN_FP_CLEARANCE для гарантии, что камера выше near plane.
+            // НЕ зажимаем до maxEye: при экстремально малых размерах камера может быть выше белого бокса.
+            eye = Math.max(absMin, MIN_FP_CLEARANCE);
         } else {
-            eye = Math.max(minEye, Math.min(maxEye, eye));
+            // Нормальный случай: зажимаем внутрь AABB, но с учётом MIN_FP_CLEARANCE.
+            // Это гарантирует, что даже при малых (но не коллапсированных) AABB камера останется выше near plane.
+            float lower = Math.max(minEye, MIN_FP_CLEARANCE);
+            eye = Math.max(lower, Math.min(maxEye, eye));
         }
 
         // Микро-антиграница

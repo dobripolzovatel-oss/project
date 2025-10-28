@@ -8,21 +8,25 @@ import net.minecraft.client.render.Camera;
 import net.minecraft.client.render.GameRenderer;
 import net.minecraft.entity.player.PlayerEntity;
 import org.spongepowered.asm.mixin.Mixin;
-import org.spongepowered.asm.mixin.Unique;
 import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
 import seq.sequencermod.size.util.SizeCalc;
+import seq.sequencermod.size.config.MicroRenderConfig;
+import seq.sequencermod.render.RenderPassFlags;
 
 /**
  * Мягкая компенсация FOV для tiny: в первом лице немного уменьшаем FOV по мере уменьшения роста.
- * Сделано очень деликатно и сглажено, чтобы не было скачков.
+ *
+ * Исправления:
+ * - Применяем только при включённом флаге конфигурации.
+ * - Не трогаем FOV в проходе рендера руки (чтобы избежать рассинхрона матриц между world/hand).
+ * - Без меж-кадрового сглаживания (статeless), чтобы исключить накопление/артефакты в других проходах
+ *   (напр., небо/солнечные тела).
  */
 @Environment(EnvType.CLIENT)
 @Mixin(GameRenderer.class)
 public abstract class GameRendererTinyFovMixin {
-
-    @Unique private double sequencer$prevFov = -1.0;
 
     private static float scaleFor(PlayerEntity p) {
         if (p == null) return 1.0f;
@@ -34,6 +38,12 @@ public abstract class GameRendererTinyFovMixin {
     @Inject(method = "getFov(Lnet/minecraft/client/render/Camera;FZ)D",
             at = @At("RETURN"), cancellable = true)
     private void sequencer$softFov(Camera camera, float tickDelta, boolean changingFov, CallbackInfoReturnable<Double> cir) {
+        // Конфиг можно быстро выключить целиком
+        if (!MicroRenderConfig.SCALE_FOV) return;
+
+        // Рендер руки/предмета — оставляем ванильный FOV, чтобы не было расхождений
+        if (RenderPassFlags.isHand()) return;
+
         MinecraftClient mc = MinecraftClient.getInstance();
         if (mc == null) return;
 
@@ -48,18 +58,12 @@ public abstract class GameRendererTinyFovMixin {
         // Мягкий множитель FOV от масштаба (чем меньше — тем чуть уже)
         float s = scaleFor(p);
         // m(s) = 1 - 0.18*(1 - sqrt(s))  -> min около ~0.82 при очень маленьких
-        double mult = 1.0 - 0.18 * (1.0 - Math.sqrt(s));
+        double mult = 1.0 - 0.18 * (1.0 - Math.sqrt(Math.max(0.0, Math.min(1.0, s))));
         if (mult < 0.80) mult = 0.80;     // нижний предел
         if (mult > 1.00) mult = 1.00;
 
-        double target = base * mult;
-
-        // Сглаживаем, чтобы не дёргалось
-        if (this.sequencer$prevFov < 0) this.sequencer$prevFov = target;
-        double alpha = 0.25; // 0..1 (больше — быстрее)
-        double smooth = this.sequencer$prevFov + (target - this.sequencer$prevFov) * alpha;
-        this.sequencer$prevFov = smooth;
-
-        cir.setReturnValue(smooth);
+        // Статическое применение без накопления
+        double adjusted = base * mult;
+        cir.setReturnValue(adjusted);
     }
 }

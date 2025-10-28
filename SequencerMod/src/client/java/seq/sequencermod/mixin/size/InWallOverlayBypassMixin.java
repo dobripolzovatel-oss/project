@@ -7,6 +7,7 @@ import net.minecraft.block.BlockState;
 import net.minecraft.entity.EntityPose;
 import net.minecraft.entity.player.PlayerEntity;
 import org.spongepowered.asm.mixin.Mixin;
+import org.spongepowered.asm.mixin.Unique;
 import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
@@ -24,13 +25,17 @@ import seq.sequencermod.size.util.SizeCalc;
 @Mixin(InGameOverlayRenderer.class)
 public abstract class InWallOverlayBypassMixin {
 
-    private static final float TINY_BYPASS_HEIGHT = 0.12f; // 0.06..0.10 подстрой по желанию
+    @Unique private static final float TINY_BYPASS_HEIGHT = 0.12f; // 0.06..0.10 подстрой по желанию
+    // На ультра‑микро масштабах оставляем ванильный overlay (иначе «просмотр сквозь блок»)
+    @Unique private static final float MICRO_REENABLE_HEIGHT = 0.005f; // < 0.5 см — overlay включён
 
+    @Unique
     private static boolean shouldBypass(PlayerEntity p) {
         if (p == null) return false;
         if (p.getPose() == EntityPose.SLEEPING) return false; // сон оставляем ванильным
         float h = Math.max(SizeCalc.EPS, p.getDimensions(p.getPose()).height);
-        return h < TINY_BYPASS_HEIGHT;
+        // Больше микро‑порога и меньше tiny‑порога — байпасим; иначе — ваниль
+        return h >= MICRO_REENABLE_HEIGHT && h < TINY_BYPASS_HEIGHT;
     }
 
     @Inject(

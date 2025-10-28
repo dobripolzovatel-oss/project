@@ -16,6 +16,9 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
 @Mixin(LivingEntity.class)
 public abstract class PlayerEyeHeightProportionalMixin {
 
+    // Минимальная абсолютная высота глаз над полом, чтобы не видеть "подземелье"
+    private static final float MIN_ABS_EYE = 0.02f; // 2 см
+
     @Inject(
             method = "getEyeHeight(Lnet/minecraft/entity/EntityPose;Lnet/minecraft/entity/EntityDimensions;)F",
             at = @At("HEAD"),
@@ -30,10 +33,20 @@ public abstract class PlayerEyeHeightProportionalMixin {
         float ratio = ratioForPose(pose);
         float eye = h * ratio;
 
-        // Анти-граница: держим глаз строго ниже потолка хитбокса
-        float clearance = Math.max(1.0e-6f, h * 1.0e-3f);
-        eye = Math.min(eye, Math.max(1.0e-9f, h - clearance));
+        // Базовое смещение от потолка хитбокса, когда это имеет смысл
+        float clearanceTop = Math.max(1.0e-6f, h * 1.0e-3f);
+
+        // Минимальная абсолютная высота глаз: держим камеру не ниже 2 см над полом
+        if (eye < MIN_ABS_EYE) eye = MIN_ABS_EYE;
+
+        // Если хитбокс достаточно высокий, можно ограничить глаз сверху хитбоксом; иначе — позволяем камере быть выше хитбокса
+        if (h > MIN_ABS_EYE + clearanceTop) {
+            eye = Math.min(eye, Math.max(1.0e-9f, h - clearanceTop));
+        }
+
+        // Анти‑граница: гарантируем положительную величину и небольшой отвод вверх
         eye = Math.max(1.0e-9f, eye);
+        eye = Math.nextUp(eye);
 
         cir.setReturnValue(eye);
     }

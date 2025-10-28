@@ -8,11 +8,21 @@ public final class SizeCalc {
     private SizeCalc(){}
 
     public static final float EPS = 0.00001f;
-    private static final float TOP_MARGIN = EPS;
+    // Минимальное положительное значение для высоты глаз (во избежание нуля/отрицательного)
+    private static final float MIN_POS = 1.0e-9f;
+
+    // Абсолютный TOP_MARGIN заменяем на относительный, чтобы при h≈EPS не получать h - margin <= 0
+    private static float topMargin(float h) {
+        // 5% от высоты, но не меньше 0.1*EPS и не больше половины высоты
+        float m = Math.max(EPS * 0.1f, h * 0.05f);
+        if (m >= h) m = Math.nextAfter(h * 0.5f, 0.0f);
+        return m;
+    }
 
     // Авто eye с микро-диапазоном (55..95% высоты) для h<0.05
     public static float resolveEye(PlayerSizeData d, EntityPose pose, EntityDimensions dims) {
         float h = Math.max(EPS, dims.height);
+        float margin = topMargin(h);
 
         float eye;
         if (d.eyeHeight != null && d.manualEye) {
@@ -32,22 +42,25 @@ public final class SizeCalc {
                 if (eye > max) eye = max;
             } else {
                 float minClear = Math.max(0.02f, h * 0.45f);
-                if (minClear > h - TOP_MARGIN) minClear = Math.max(0.02f, h * 0.5f);
+                if (minClear > h - margin) minClear = Math.max(0.02f, h * 0.5f);
                 if (eye < minClear) eye = minClear;
-                if (eye > h - TOP_MARGIN) eye = h - TOP_MARGIN;
+                if (eye > h - margin) eye = h - margin;
             }
         }
-        if (eye > h) eye = h - TOP_MARGIN;
-        if (eye < EPS) eye = EPS;
+        // Верхняя граница — не топ хитбокса, а (h - margin)
+        if (eye > h - margin) eye = h - margin;
+        if (eye < MIN_POS) eye = MIN_POS;
 
-        // Анти‑граница: отводим глаз на 1 ULP вверх, чтобы не лежал ровно на плоскости блока
-        // (пример: eye=0.050000f → isInsideWall мог срабатывать). Это микроскопический шаг для float.
-        eye = Math.min(h - TOP_MARGIN, Math.nextUp(eye));
+        // Анти‑граница: двигаем глаз на 1 ULP вверх, но не уменьшаем его и не выходим за (h - margin)
+        float nudged = Math.max(eye, Math.nextUp(eye));
+        eye = Math.min(h - margin, nudged);
+        if (eye < MIN_POS) eye = MIN_POS;
 
         return eye;
     }
 
     private static float clampEyeManual(float eye, float h) {
+        float margin = topMargin(h);
         if (h < 0.05f) {
             float minFrac = 0.55f, maxFrac = 0.95f;
             float min = h * minFrac, max = h * maxFrac;
@@ -55,13 +68,16 @@ public final class SizeCalc {
             if (eye > max) eye = max;
         } else {
             float minClear = Math.max(0.02f, h * 0.45f);
-            if (minClear > h - TOP_MARGIN) minClear = Math.max(0.02f, h * 0.5f);
+            if (minClear > h - margin) minClear = Math.max(0.02f, h * 0.5f);
             if (eye < minClear) eye = minClear;
-            if (eye > h - TOP_MARGIN) eye = h - TOP_MARGIN;
+            if (eye > h - margin) eye = h - margin;
         }
 
         // Тот же анти‑граница для ручного глаза
-        eye = Math.min(h - TOP_MARGIN, Math.nextUp(Math.max(EPS, eye)));
+        float base = Math.max(MIN_POS, eye);
+        float nudged = Math.max(base, Math.nextUp(base));
+        eye = Math.min(h - margin, nudged);
+        if (eye < MIN_POS) eye = MIN_POS;
         return eye;
     }
 

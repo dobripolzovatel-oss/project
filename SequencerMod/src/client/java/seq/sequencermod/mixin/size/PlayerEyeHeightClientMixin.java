@@ -10,6 +10,7 @@ import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
+import seq.sequencermod.core.debug.DebugTaps;
 import seq.sequencermod.size.util.WhiteHitboxScale;
 
 /**
@@ -25,10 +26,10 @@ public abstract class PlayerEyeHeightClientMixin {
 
     /**
      * Минимальный клиренс для first-person камеры над поверхностью блока.
-     * ~6 см (0.06 блока), что выше типичной near plane (~0.05 блока).
-     * Гарантирует, что камера не окажется внутри геометрии пола при экстремально малых размерах.
+     * ~12 см (0.12 блока), что надёжно выше типичной near plane (~0.05 блока) с запасом.
+     * Гарантирует, что камера не окажется внутри геометрии пола при экстремально малых размерах (1e-3..1e-5).
      */
-    private static final float MIN_FP_CLEARANCE = 0.06f;
+    private static final float MIN_FP_CLEARANCE = 0.12f;
 
     private static float ratioForPose(EntityPose pose) {
         if (pose == null) return 0.90f;
@@ -104,11 +105,21 @@ public abstract class PlayerEyeHeightClientMixin {
             // Применяем MIN_FP_CLEARANCE для гарантии, что камера выше near plane.
             // НЕ зажимаем до maxEye: при экстремально малых размерах камера может быть выше белого бокса.
             eye = Math.max(absMin, MIN_FP_CLEARANCE);
+            
+            if (DebugTaps.active.get()) {
+                DebugTaps.logf("[PlayerEyeHeightClient] ULTRA-TINY: h=%.6f, pose=%s, absMin=%.6f, eye=%.6f",
+                        h, pose, absMin, eye);
+            }
         } else {
             // Нормальный случай: зажимаем внутрь AABB, но с учётом MIN_FP_CLEARANCE.
             // Это гарантирует, что даже при малых (но не коллапсированных) AABB камера останется выше near plane.
             float lower = Math.max(minEye, MIN_FP_CLEARANCE);
             eye = Math.max(lower, Math.min(maxEye, eye));
+            
+            if (DebugTaps.active.get()) {
+                DebugTaps.logf("[PlayerEyeHeightClient] NORMAL: h=%.6f, pose=%s, lower=%.6f, maxEye=%.6f, eye=%.6f",
+                        h, pose, lower, maxEye, eye);
+            }
         }
 
         // Микро-антиграница

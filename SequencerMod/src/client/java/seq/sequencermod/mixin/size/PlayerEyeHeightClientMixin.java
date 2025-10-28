@@ -34,6 +34,12 @@ public abstract class PlayerEyeHeightClientMixin {
      */
     private static final float MIN_FP_CLEARANCE = 0.12f;
 
+    /**
+     * Смещение для определения блока под ногами игрока.
+     * Используется для надёжного определения опорного блока даже на границах блоков.
+     */
+    private static final double FEET_OFFSET = 0.1;
+
     private static float ratioForPose(EntityPose pose) {
         if (pose == null) return 0.90f;
         return switch (pose) {
@@ -85,7 +91,7 @@ public abstract class PlayerEyeHeightClientMixin {
         // getBlockPos() возвращает блок, содержащий позицию игрока
         // Для надёжности берём блок ниже позиции ног с небольшим смещением
         double feetY = player.getY();
-        BlockPos pos = BlockPos.ofFloored(player.getX(), feetY - 0.1, player.getZ());
+        BlockPos pos = BlockPos.ofFloored(player.getX(), feetY - FEET_OFFSET, player.getZ());
         BlockState state = player.getWorld().getBlockState(pos);
         
         // Получаем форму коллизии блока

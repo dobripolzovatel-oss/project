@@ -14,7 +14,7 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
 import seq.sequencermod.size.util.SizeCalc;
 
 /**
- * Client-only: отключаем именно in-wall overlay для очень маленького игрока.
+ * Client-only: отключаем in-wall overlay (чёрный экран) для маленького игрока в первом лице.
  * Делается на этапе определения состояния блока: getInWallBlockState(player) -> null,
  * тогда renderInWallOverlay(...) просто не вызывается.
  *
@@ -25,17 +25,16 @@ import seq.sequencermod.size.util.SizeCalc;
 @Mixin(InGameOverlayRenderer.class)
 public abstract class InWallOverlayBypassMixin {
 
-    @Unique private static final float TINY_BYPASS_HEIGHT = 0.12f; // 0.06..0.10 подстрой по желанию
-    // На ультра‑микро масштабах оставляем ванильный overlay (иначе «просмотр сквозь блок»)
-    @Unique private static final float MICRO_REENABLE_HEIGHT = 0.005f; // < 0.5 см — overlay включён
+    // Отключаем overlay для всех "tiny" — синхронизировано с остальными миксинами
+    @Unique private static final float TINY_BYPASS_HEIGHT = 0.12f;
 
     @Unique
     private static boolean shouldBypass(PlayerEntity p) {
         if (p == null) return false;
-        if (p.getPose() == EntityPose.SLEEPING) return false; // сон оставляем ванильным
+        if (p.getPose() == EntityPose.SLEEPING) return false; // сон оставляем ваниле
         float h = Math.max(SizeCalc.EPS, p.getDimensions(p.getPose()).height);
-        // Больше микро‑порога и меньше tiny‑порога — байпасим; иначе — ваниль
-        return h >= MICRO_REENABLE_HEIGHT && h < TINY_BYPASS_HEIGHT;
+        // ВАЖНО: без нижнего микро‑порога — всегда байпасим overlay при h < 0.12
+        return h < TINY_BYPASS_HEIGHT;
     }
 
     @Inject(
@@ -45,7 +44,7 @@ public abstract class InWallOverlayBypassMixin {
     )
     private static void sequencer$nullInWallForTiny(PlayerEntity player, CallbackInfoReturnable<BlockState> cir) {
         if (shouldBypass(player)) {
-            // Сообщаем "нет блока в камере" — in-wall overlay не будет отрисован
+            // Сообщаем "нет блока у камеры" — overlay не будет отрисован
             cir.setReturnValue(null);
         }
     }

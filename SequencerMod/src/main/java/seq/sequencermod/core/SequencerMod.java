@@ -45,6 +45,9 @@ public final class SequencerMod implements ModInitializer {
 
 		LOG.info("SequencerMod init");
 
+		// 0) Register blocks and items
+		seq.sequencermod.betterlights.registry.BetterLightsRegistry.init();
+
 		// 1) Секвенции
 		SequenceRegistry.init();
 		SizeCommand.register();

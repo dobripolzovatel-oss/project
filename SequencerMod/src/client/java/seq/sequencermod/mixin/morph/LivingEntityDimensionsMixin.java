@@ -12,7 +12,8 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
 import seq.sequencermod.morph.MorphResolver;
 import seq.sequencermod.net.client.MorphClientSizes;
 import seq.sequencermod.net.client.MorphClientSync;
-import seq.sequencermod.net.client.PlayerClientSizes;
+import seq.sequencermod.size.PlayerClientSizes;
+import seq.sequencermod.size.PlayerSizeData;
 
 @Mixin(LivingEntity.class)
 public abstract class LivingEntityDimensionsMixin {
@@ -28,7 +29,7 @@ public abstract class LivingEntityDimensionsMixin {
         if (!(self instanceof PlayerEntity player)) return;
 
         // 1) Индивидуальный размер игрока (S2C player_size_sync)
-        var ps = PlayerClientSizes.get(player.getUuid());
+        PlayerSizeData ps = PlayerClientSizes.get(player.getUuid());
         if (ps != null) {
             cir.setReturnValue(EntityDimensions.changing(ps.width, ps.height));
             return;

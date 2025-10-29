@@ -5,8 +5,9 @@ import net.fabricmc.api.Environment;
 import net.fabricmc.fabric.api.client.networking.v1.ClientPlayConnectionEvents;
 import net.fabricmc.fabric.api.client.networking.v1.ClientPlayNetworking;
 import net.minecraft.client.MinecraftClient;
-import net.minecraft.network.PacketByteBuf;
 import seq.sequencermod.network.MorphPackets;
+import seq.sequencermod.size.PlayerClientSizes;
+import seq.sequencermod.size.PlayerSizeData;
 
 import java.util.UUID;
 
@@ -39,9 +40,11 @@ public final class PlayerSizeClientSync {
 
             client.execute(() -> {
                 if (!active) {
-                    PlayerClientSizes.clear(who);
+                    // Удаляем запись только для конкретного игрока
+                    PlayerClientSizes.remove(who);
                 } else {
-                    PlayerClientSizes.set(who, fW, fH, fEye);
+                    // Единый стор: кладём PlayerSizeData
+                    PlayerClientSizes.put(who, new PlayerSizeData(fW, fH, fEye, null, false, false));
                 }
 
                 MinecraftClient mc = MinecraftClient.getInstance();
@@ -52,7 +55,8 @@ public final class PlayerSizeClientSync {
         });
 
         ClientPlayConnectionEvents.DISCONNECT.register((handler, client) -> {
-            PlayerClientSizes.clearAll();
+            // Полная очистка стора при отключении
+            PlayerClientSizes.clear();
         });
     }
 }

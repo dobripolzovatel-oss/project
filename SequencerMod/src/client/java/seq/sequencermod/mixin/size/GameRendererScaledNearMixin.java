@@ -20,8 +20,9 @@ import seq.sequencermod.size.PlayerSizeData;
 import seq.sequencermod.size.config.MicroRenderConfig;
 
 /**
- * Подменяем проекцию ТОЛЬКО если клиент получил валидный уменьшенный размер от сервера.
- * При обычном росте — всегда ванильная матрица (никакой подмены).
+ * Проекцию под tiny/micro включаем ТОЛЬКО при валидных данных размера от сервера
+ * и при обнаружении реально близкой геометрии трассировкой лучей.
+ * Иначе — ванильная матрица.
  */
 @Environment(EnvType.CLIENT)
 @Mixin(GameRenderer.class)
@@ -34,22 +35,19 @@ public abstract class GameRendererScaledNearMixin {
         MinecraftClient mc = MinecraftClient.getInstance();
         if (mc == null || mc.world == null || mc.getWindow() == null) return;
 
-        // Только 1-е лицо
         Perspective persp = mc.options != null ? mc.options.getPerspective() : Perspective.FIRST_PERSON;
         if (persp == null || !persp.isFirstPerson()) return;
 
         PlayerEntity p = mc.player;
         if (p == null) return;
 
-        // Берем рост только из серверных клиентских данных. Если их нет — не подменяем.
+        // ЕДИНЫЙ стор
         PlayerSizeData data = PlayerClientSizes.get(p.getUuid());
-        if (data == null) return;
-        if (!(data.height > 0.0f)) return;
+        if (data == null || !(data.height > 0.0f)) return;
 
         float sizeH = data.height;
         if (sizeH >= MicroRenderConfig.TINY_NEAR_THRESHOLD) {
-            // Нормальный рост — оставляем ванильную матрицу
-            return;
+            return; // обычный рост — ваниль
         }
 
         int fbw = Math.max(1, mc.getWindow().getFramebufferWidth());
@@ -59,9 +57,9 @@ public abstract class GameRendererScaledNearMixin {
 
         final boolean micro = sizeH < 0.005f;
         final float NEAR_MIN = micro ? 5.0e-5f : MicroRenderConfig.NEAR_MIN_SAFE_TINY;
-        final float NEAR_MAX = micro ? 0.0050f : MicroRenderConfig.NEAR_MAX_SAFE_TINY;
+        final float NEAR_MAX = micro ? 0.0035f : MicroRenderConfig.NEAR_MAX_SAFE_TINY;
 
-        // Оценка минимальной дистанции до геометрии. Если ничего не нашли — не подменяем.
+        // Лучевая оценка: если ничего близко не нашли — НЕ подменяем
         Float nearOpt = null;
         try {
             Camera cam = ((GameRenderer) (Object) this).getCamera();
@@ -75,7 +73,7 @@ public abstract class GameRendererScaledNearMixin {
                 double basePitch = cam.getPitch();
                 double baseYaw   = cam.getYaw();
 
-                final double maxProbe = 1.0;   // короткий щуп, нас интересует ближайшая геометрия
+                final double maxProbe = 1.0;
                 final double backEps  = 1.0e-3;
 
                 double minHit = Double.POSITIVE_INFINITY;
@@ -100,7 +98,6 @@ public abstract class GameRendererScaledNearMixin {
             }
         } catch (Throwable ignored) {}
 
-        // Если оценка не получилась — оставляем ванильную матрицу.
         if (nearOpt == null || !(nearOpt > 0.0f)) return;
 
         float farBase =
@@ -108,10 +105,10 @@ public abstract class GameRendererScaledNearMixin {
                         (sizeH < MicroRenderConfig.TINY_THRESHOLD) ? MicroRenderConfig.FAR_CLIP_TINY :
                                 MicroRenderConfig.FAR_CLIP;
 
-        float maxRatio = Math.max(10_000f, MicroRenderConfig.FAR_NEAR_MAX_RATIO);
-
+        // Жёсткие страховки, чтобы мир точно попадал в frustum
+        float maxRatio = Math.min(MicroRenderConfig.FAR_NEAR_MAX_RATIO, 500_000f);
         float near = nearOpt;
-        float far = Math.max(32.0f, Math.min(farBase, near * maxRatio));
+        float far = Math.max(256.0f, Math.min(farBase, near * maxRatio));
         if (!(far > near)) far = near + Math.max(0.01f, near);
 
         float fovRad = (float) Math.toRadians(fovDegOriginal);
@@ -121,12 +118,9 @@ public abstract class GameRendererScaledNearMixin {
             Matrix4f proj = new Matrix4f().setPerspective(fovRad, aspect, near, far);
             cir.setReturnValue(proj);
         } catch (Throwable t) {
-            // На всякий случай — безопасный фолбэк
+            // На всякий случай — ванильный безопасный фолбэк
             float fbNear = 0.05f;
-            float fbFar =
-                    (sizeH < 0.005f) ? Math.max(256f, MicroRenderConfig.FAR_CLIP_MICRO) :
-                            (sizeH < MicroRenderConfig.TINY_THRESHOLD) ? Math.max(512f, MicroRenderConfig.FAR_CLIP_TINY) :
-                                    Math.max(1024f, MicroRenderConfig.FAR_CLIP);
+            float fbFar  = Math.max(2048f, farBase);
             if (fbFar <= fbNear) fbFar = fbNear + 1.0f;
             Matrix4f proj = new Matrix4f().setPerspective(fovRad, aspect, fbNear, fbFar);
             cir.setReturnValue(proj);

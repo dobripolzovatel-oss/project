@@ -14,7 +14,7 @@ public final class MicroRenderConfig {
     public static final double MAX_FOV_REDUCTION = 0.55;
 
     // ----- Безопасный near/far для 1-го лица -----
-    public static final boolean ENABLE_CUSTOM_NEAR = true;
+    public static final boolean ENABLE_CUSTOM_NEAR = false;
     // Базовые клампы near для обычных размеров
     public static final float NEAR_MIN_SAFE = 0.0010f;
     public static final float NEAR_MAX_SAFE = 0.0050f;

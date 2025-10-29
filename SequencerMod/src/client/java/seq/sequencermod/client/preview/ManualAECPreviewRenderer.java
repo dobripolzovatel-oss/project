@@ -24,6 +24,7 @@ import net.minecraft.util.Identifier;
 import net.minecraft.util.math.RotationAxis;
 import org.joml.Matrix3f;
 import org.joml.Matrix4f;
+import org.lwjgl.opengl.GL11;
 
 /**
  * Превью‑рендер AEC:
@@ -34,6 +35,40 @@ import org.joml.Matrix4f;
  */
 public final class ManualAECPreviewRenderer {
     private ManualAECPreviewRenderer() {}
+
+    /**
+     * GL state guard for saving and restoring viewport and scissor state.
+     * Used to prevent state leakage from offscreen rendering.
+     */
+    private static final class GlStateGuard {
+        private final int[] viewport = new int[4];
+        private final int[] scissorBox = new int[4];
+        private final boolean scissorEnabled;
+
+        private GlStateGuard() {
+            // Capture current viewport
+            GL11.glGetIntegerv(GL11.GL_VIEWPORT, viewport);
+            // Capture current scissor box
+            GL11.glGetIntegerv(GL11.GL_SCISSOR_BOX, scissorBox);
+            // Capture scissor enabled state
+            scissorEnabled = GL11.glIsEnabled(GL11.GL_SCISSOR_TEST);
+        }
+
+        public static GlStateGuard capture() {
+            return new GlStateGuard();
+        }
+
+        public void restore() {
+            // Restore viewport
+            RenderSystem.viewport(viewport[0], viewport[1], viewport[2], viewport[3]);
+            // Restore scissor state
+            if (scissorEnabled) {
+                RenderSystem.enableScissor(scissorBox[0], scissorBox[1], scissorBox[2], scissorBox[3]);
+            } else {
+                RenderSystem.disableScissor();
+            }
+        }
+    }
 
     private static final Identifier WHITE_TEX = new Identifier("minecraft", "textures/misc/white.png");
 
@@ -70,10 +105,20 @@ public final class ManualAECPreviewRenderer {
 
         ensureFbo(w, h);
 
-        // 1) Рисуем в FBO
-        PREVIEW_FBO.beginWrite(true);
-        AecPreviewProbe.gl("MAEC FBO: beginWrite"); // выставляет viewport = w×h
+        // Capture GL state and perform offscreen rendering with proper cleanup
+        GlStateGuard guard = null;
         try {
+            // Capture GL state before offscreen rendering
+            guard = GlStateGuard.capture();
+            AecPreviewProbe.gl("MAEC FBO: before-offscreen");
+
+            // 1) Рисуем в FBO
+            PREVIEW_FBO.beginWrite(true);
+            AecPreviewProbe.gl("MAEC FBO: after-beginWrite"); // выставляет viewport = w×h
+            
+            // Ensure scissor is disabled for offscreen pass
+            RenderSystem.disableScissor();
+            
             RenderSystem.clearColor(0f, 0f, 0f, 0f);
             // GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT
             RenderSystem.clear(0x4100, MinecraftClient.IS_SYSTEM_MAC);
@@ -88,17 +133,25 @@ public final class ManualAECPreviewRenderer {
             ms.scale(pixelsPerUnit, pixelsPerUnit, pixelsPerUnit);
             render(ms, null, aec, tickDelta, style);
             ms.pop();
-        } finally {
-            PREVIEW_FBO.endWrite();
-            // вернуть viewport окна
-            RenderSystem.viewport(0, 0, window.getFramebufferWidth(), window.getFramebufferHeight());
-        }
 
-        // 2) Блитим содержимое FBO в прямоугольник GUI
-        AecPreviewProbe.out("MAEC FBO: blit begin");
-        blitFbo(ctx, PREVIEW_FBO, x, y, w, h);
-        AecPreviewProbe.out("MAEC FBO: blit end");
-        AecPreviewProbe.out("MAEC FBO: leave");
+            PREVIEW_FBO.endWrite();
+            AecPreviewProbe.gl("MAEC FBO: after-offscreen");
+
+            // Restore main framebuffer
+            mc.getFramebuffer().beginWrite(true);
+
+            // 2) Блитим содержимое FBO в прямоугольник GUI
+            AecPreviewProbe.out("MAEC FBO: blit begin");
+            blitFbo(ctx, PREVIEW_FBO, x, y, w, h);
+            AecPreviewProbe.out("MAEC FBO: blit end");
+        } finally {
+            // Restore captured GL state
+            if (guard != null) {
+                guard.restore();
+                AecPreviewProbe.gl("MAEC FBO: after-restore");
+            }
+            AecPreviewProbe.out("MAEC FBO: leave");
+        }
     }
 
     // Ручной блит color‑attachment FBO в прямоугольник GUI

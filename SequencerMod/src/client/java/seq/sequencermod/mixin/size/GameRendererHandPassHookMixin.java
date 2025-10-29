@@ -14,6 +14,7 @@ import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 import org.spongepowered.asm.mixin.gen.Invoker;
+import seq.sequencermod.render.RenderPassFlags;
 import seq.sequencermod.size.PlayerClientSizes;
 import seq.sequencermod.size.PlayerSizeData;
 import seq.sequencermod.size.config.MicroRenderConfig;
@@ -34,6 +35,9 @@ public abstract class GameRendererHandPassHookMixin {
 
     @Inject(method = "renderHand", at = @At("HEAD"))
     private void sequencer$enterHand(net.minecraft.client.util.math.MatrixStack matrices, Camera camera, float tickDelta, CallbackInfo ci) {
+        // Mark that we're entering the hand pass
+        RenderPassFlags.enterHand();
+
         if (!MicroRenderConfig.APPLY_CUSTOM_NEAR_IN_HAND) return; // сейчас выключено
 
         MinecraftClient mc = MinecraftClient.getInstance();
@@ -86,15 +90,20 @@ public abstract class GameRendererHandPassHookMixin {
 
     @Inject(method = "renderHand", at = @At("RETURN"))
     private void sequencer$exitHand(net.minecraft.client.util.math.MatrixStack matrices, Camera camera, float tickDelta, CallbackInfo ci) {
-        if (!sequencer$handPushed) return;
         try {
-            if (sequencer$prevProj != null) {
-                loadProjectionMatrix(sequencer$prevProj);
+            if (sequencer$handPushed && sequencer$prevProj != null) {
+                try {
+                    loadProjectionMatrix(sequencer$prevProj);
+                } catch (Throwable ignored) {
+                    // Ignore projection restoration errors
+                }
             }
-        } catch (Throwable ignored) {
         } finally {
+            // Always clean up state flags
             sequencer$handPushed = false;
             sequencer$prevProj = null;
+            // Always mark that we're exiting the hand pass, even if an exception occurred
+            RenderPassFlags.exitHand();
         }
     }
 }

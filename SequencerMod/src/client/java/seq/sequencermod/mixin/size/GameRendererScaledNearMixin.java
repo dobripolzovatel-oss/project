@@ -19,9 +19,11 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
 import seq.sequencermod.size.config.MicroRenderConfig;
 
 /**
- * Динамический near/far в первом лице с учётом минимума глубины по 9 лучам (центр + 4 угла + 4 середины рёбер).
- * - Рэйкаст стартует на небольшом смещении позади камеры, чтобы гарантировать пересечение ближайшей грани.
- * - Ограничение far/near корректно соблюдается: при необходимости понижаем far и/или повышаем near.
+ * Проекция 1-го лица с анти‑клиппингом у стены:
+ * - near вычисляем из минимума глубины по 13 лучам внутри текущего FOV (центр, углы, рёбра, полу‑углы),
+ *   стартуя лучи с маленьким смещением назад от глаза, чтобы гарантировать пересечение грани.
+ * - В микро‑режиме понижаем far до near*MAX_RATIO (вплоть до очень малого far), чтобы не приходилось
+ *   поднимать near из‑за ограничения отношения — это устраняет «уголки» и «просветы».
  */
 @Environment(EnvType.CLIENT)
 @Mixin(GameRenderer.class)
@@ -54,16 +56,16 @@ public abstract class GameRendererScaledNearMixin {
         float sizeH = (float) h;
 
         // Базовые клампы
-        final float NEAR_ABS_MIN  = 1.0e-6f;
+        final float NEAR_ABS_MIN  = 1.0e-7f; // разрешим ещё ниже в экстремуме
         final float NEAR_SOFT_MIN = 5.0e-5f;
         final float NEAR_MAX      = 0.0050f;
 
-        // База от размера (если ничего близко, держим мягкий минимум)
+        // База от размера
         float nearDesired = (float) (minHalfExtent * 0.50);
         float near = Math.max(NEAR_SOFT_MIN, Math.min(NEAR_MAX, nearDesired));
 
-        // Коррекция near по минимальной дистанции в пределах текущего FOV
-        if (sizeH < 0.06f) {
+        // Плотная выборка внутри фрустума: 13 лучей
+        if (sizeH < 0.10f) {
             try {
                 Camera cam = ((GameRenderer) (Object) this).getCamera();
                 if (cam != null) {
@@ -71,32 +73,30 @@ public abstract class GameRendererScaledNearMixin {
                     final double halfVFov = 0.5 * fovRad;
                     final double halfHFov = Math.atan(Math.tan(halfVFov) * aspect);
 
-                    // 9 направлений: центр, 4 угла, 4 ребра
-                    double[] pitchOff = new double[] {
-                            0.0,
-                            +halfVFov, +halfVFov, -halfVFov, -halfVFov, // углы
-                            +halfVFov, -halfVFov, 0.0,        0.0       // рёбра: вверх/вниз/лево/право
+                    // Масштабы смещений по углам/рёбрам/полу‑углам
+                    // 0 — центр, ±1 — край FOV, ±0.5 — полу‑углы/полу‑рёбра
+                    double[] pitchScale = new double[] {
+                            0.0,  +1, +1, -1, -1,   +1, -1,   0,  0,    +0.5, +0.5, -0.5, -0.5
                     };
-                    double[] yawOff = new double[] {
-                            0.0,
-                            -halfHFov, +halfHFov, -halfHFov, +halfHFov, // углы
-                            0.0,        0.0,        -halfHFov, +halfHFov // рёбра
+                    double[] yawScale   = new double[] {
+                            0.0,  -1, +1, -1, +1,    0,  0,   -1, +1,   -0.5, +0.5, -0.5, +0.5
                     };
 
-                    final Vec3d eye0 = cam.getPos();
+                    final Vec3d eye = cam.getPos();
                     final double basePitch = cam.getPitch();
                     final double baseYaw   = cam.getYaw();
-                    final double maxProbe  = 1.0;     // до 1 блока вперёд
-                    final double backEps   = 1.0e-3;  // отступ назад, чтобы не начинать "в плоскости"
+
+                    final double maxProbe = 1.25;   // до ~1.25 блока
+                    final double backEps  = 1.0e-3; // старт чуть позади глаза
 
                     double minHit = Double.POSITIVE_INFINITY;
 
-                    for (int i = 0; i < pitchOff.length; i++) {
-                        final double pitchDeg = basePitch + Math.toDegrees(pitchOff[i]);
-                        final double yawDeg   = baseYaw   + Math.toDegrees(yawOff[i]);
+                    for (int i = 0; i < pitchScale.length; i++) {
+                        double pitchDeg = basePitch + Math.toDegrees(halfVFov * pitchScale[i]);
+                        double yawDeg   = baseYaw   + Math.toDegrees(halfHFov * yawScale[i]);
 
                         Vec3d dir = Vec3d.fromPolar((float) pitchDeg, (float) yawDeg).normalize();
-                        Vec3d start = eye0.subtract(dir.multiply(backEps)); // сместили старт назад
+                        Vec3d start = eye.subtract(dir.multiply(backEps));
                         Vec3d end   = start.add(dir.multiply(maxProbe + backEps));
 
                         HitResult hit = mc.world.raycast(new RaycastContext(
@@ -106,51 +106,44 @@ public abstract class GameRendererScaledNearMixin {
                                 p
                         ));
                         if (hit != null && hit.getType() != HitResult.Type.MISS) {
-                            double dist = Math.max(0.0, hit.getPos().distanceTo(eye0)); // измеряем от реального глаза
+                            double dist = Math.max(0.0, hit.getPos().distanceTo(eye));
                             if (dist > 0.0 && dist < minHit) minHit = dist;
                         }
                     }
 
                     if (minHit != Double.POSITIVE_INFINITY) {
-                        // Берём 60% от минимальной глубины в фрустуме — более безопасно у самых малых масштабов
-                        float nearFromFrustum = (float) Math.max(NEAR_ABS_MIN, minHit * 0.60);
+                        // Более агрессивный запас: ~60% → 35% от найденной минимальной глубины
+                        float nearFromFrustum = (float) Math.max(NEAR_ABS_MIN, minHit * 0.35);
                         near = Math.max(NEAR_ABS_MIN, Math.min(NEAR_MAX, Math.min(near, nearFromFrustum)));
                     }
                 }
             } catch (Throwable ignored) {
-                // Оставляем базовый near
+                // остаёмся на базовом near
             }
         }
 
-        // База far
+        // База far (как раньше)
         float farBase =
                 (sizeH < 0.005f) ? MicroRenderConfig.FAR_CLIP_MICRO :
                         (sizeH < MicroRenderConfig.TINY_THRESHOLD) ? MicroRenderConfig.FAR_CLIP_TINY :
                                 MicroRenderConfig.FAR_CLIP;
 
-        // Минимальный допустимый far (для стабильности глубины)
-        final float FAR_MIN = 32.0f;
-
-        float far = Math.max(FAR_MIN, Math.max(near * 4.0f, farBase));
-
-        // Корректное соблюдение соотношения far/near
+        // Отношение far/near: в микро‑режиме понижаем far, а не повышаем near
         float maxRatio = Math.max(10_000f, MicroRenderConfig.FAR_NEAR_MAX_RATIO);
+        float far = farBase;
 
-        // Сначала пробуем понизить far, чтобы уложиться в отношение
-        float farByRatio = near * maxRatio;
-        if (far > farByRatio) {
-            far = Math.max(FAR_MIN, farByRatio);
-        }
-        // Если всё ещё нарушено (например, упёрлись в FAR_MIN), поднимем near
-        if (far / near > maxRatio) {
-            near = Math.max(near, far / maxRatio);
-            // И пересчитаем страхующие клампы
-            near = Math.max(NEAR_ABS_MIN, Math.min(NEAR_MAX, near));
+        // Если near совсем мал (кадры «упор в стену»), позволим far опуститься
+        if (near < 1.0e-4f) {
+            // Не больше, чем near*ratio; и не ниже 8 блоков — чтобы мир не рассыпался совсем
+            far = Math.min(far, Math.max(8.0f, near * maxRatio));
+        } else {
+            // Обычно: режем far по отношению, но держим небольшой минимум
+            far = Math.max(32.0f, Math.min(far, near * maxRatio));
         }
 
-        // Гарантия строгого неравенства
-        if (!(far > near)) {
-            far = near + Math.max(0.01f, near);
+        // Дополнительная страховка на видимость: far должен быть хотя бы немного дальше near
+        if (far <= near) {
+            far = Math.max(near + Math.max(0.01f, near * 4.0f), 8.0f);
         }
 
         float fovRad = (float) Math.toRadians(fovDegOriginal);

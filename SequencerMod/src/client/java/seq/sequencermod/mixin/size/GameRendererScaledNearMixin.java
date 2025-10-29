@@ -16,12 +16,14 @@ import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
+import seq.sequencermod.size.PlayerClientSizes;
+import seq.sequencermod.size.PlayerSizeData;
 import seq.sequencermod.size.config.MicroRenderConfig;
 
 /**
- * Кастомная проекция только для tiny/микро размеров.
- * Для обычного роста — ванильная матрица (проблема «всё пропало» была из-за
- * применения экстремально малого near на нормальном размере).
+ * Кастомная проекция включается ТОЛЬКО когда клиент знает,
+ * что у игрока реально уменьшенный хитбокс (данные пришли от сервера).
+ * Для обычного роста — всегда ванильная матрица.
  */
 @Environment(EnvType.CLIENT)
 @Mixin(GameRenderer.class)
@@ -29,6 +31,9 @@ public abstract class GameRendererScaledNearMixin {
 
     @Inject(method = "getBasicProjectionMatrix(D)Lorg/joml/Matrix4f;", at = @At("HEAD"), cancellable = true)
     private void sequencer$customProjection(double fovDegOriginal, CallbackInfoReturnable<Matrix4f> cir) {
+        // Быстрый выход по конфигу
+        if (!MicroRenderConfig.ENABLE_CUSTOM_NEAR) return;
+
         MinecraftClient mc = MinecraftClient.getInstance();
         if (mc == null || mc.world == null || mc.getWindow() == null) return;
 
@@ -39,30 +44,29 @@ public abstract class GameRendererScaledNearMixin {
         PlayerEntity p = mc.player;
         if (p == null) return;
 
+        // ВАЖНО: используем ТОЛЬКО явные клиентские данные скейла от сервера.
+        // Если данных нет — считаем размер ванильным и не трогаем проекцию.
+        PlayerSizeData data = PlayerClientSizes.get(p.getUuid());
+        if (data == null) return;
+
+        float sizeH = (float) Math.max(1.0e-12, data.height);
+        if (sizeH >= MicroRenderConfig.TINY_NEAR_THRESHOLD) {
+            // нормальный рост — ванильная матрица
+            return;
+        }
+
         int fbw = Math.max(1, mc.getWindow().getFramebufferWidth());
         int fbh = Math.max(1, mc.getWindow().getFramebufferHeight());
         float aspect = (float) fbw / (float) fbh;
         if (!(aspect > 0.0f) || Float.isInfinite(aspect) || Float.isNaN(aspect)) return;
-
-        // Высота хитбокса игрока
-        Box bb = p.getBoundingBox();
-        float sizeH = (float) Math.max(1.0e-12, bb.getYLength());
-
-        // ВАЖНО: для нормального размера не трогаем проекцию вообще — оставляем ванильную
-        if (sizeH >= MicroRenderConfig.TINY_NEAR_THRESHOLD) {
-            // не отменяем — пусть выполнится оригинальный метод
-            return;
-        }
 
         // Клампы near зависят от «насколько маленький» размер
         final boolean micro = sizeH < 0.005f;
         final float NEAR_MIN = micro ? 5.0e-5f : MicroRenderConfig.NEAR_MIN_SAFE_TINY;   // 5e-5 для микро, иначе «почти микро»
         final float NEAR_MAX = micro ? 0.0050f : MicroRenderConfig.NEAR_MAX_SAFE_TINY;
 
-        // База — минимально допустимый
-        float near = NEAR_MIN;
-
         // Оценка минимальной дистанции до геометрии по сетке лучей (5x5)
+        float nearComputed = Float.NaN;
         try {
             Camera cam = ((GameRenderer) (Object) this).getCamera();
             if (cam != null) {
@@ -96,22 +100,27 @@ public abstract class GameRendererScaledNearMixin {
                 }
 
                 if (minHit != Double.POSITIVE_INFINITY) {
-                    // Берём near немного меньше обнаруженного минимума
-                    float candidate = (float) Math.max(NEAR_MIN, minHit * 0.75);
-                    near = Math.max(NEAR_MIN, Math.min(NEAR_MAX, candidate));
+                    float candidate = (float) (minHit * 0.75);
+                    nearComputed = Math.max(NEAR_MIN, Math.min(NEAR_MAX, candidate));
                 }
             }
         } catch (Throwable ignored) {}
 
-        // Far — из конфигурации по размеру
+        // Если не смогли оценить near надёжно — НЕ подменяем матрицу (оставляем ванильную)
+        if (!(nearComputed > 0.0f)) {
+            return;
+        }
+
+        // Дальняя плоскость по размеру
         float farBase =
                 (sizeH < 0.005f) ? MicroRenderConfig.FAR_CLIP_MICRO :
                         (sizeH < MicroRenderConfig.TINY_THRESHOLD) ? MicroRenderConfig.FAR_CLIP_TINY :
                                 MicroRenderConfig.FAR_CLIP;
 
-        // Контролируем отношение far/near для стабильности
+        // Контроль отношения far/near
         float maxRatio = Math.max(10_000f, MicroRenderConfig.FAR_NEAR_MAX_RATIO);
 
+        float near = nearComputed;
         float far = Math.max(32.0f, Math.min(farBase, near * maxRatio));
         if (far / near > maxRatio) {
             near = Math.min(NEAR_MAX, Math.max(near, far / maxRatio));
@@ -125,9 +134,9 @@ public abstract class GameRendererScaledNearMixin {
 
         try {
             Matrix4f proj = new Matrix4f().setPerspective(fovRad, aspect, near, far);
-            cir.setReturnValue(proj); // подменяем только в tiny/микро
+            cir.setReturnValue(proj); // подменяем только в tiny/микро и только при успешной оценке near
         } catch (Throwable t) {
-            // Фолбэк: полностью безопасные значения
+            // Фолбэк: безопасные значения, если вдруг что-то пошло не так
             float fbNear = 0.05f;
             float fbFar =
                     (sizeH < 0.005f) ? Math.max(256f, MicroRenderConfig.FAR_CLIP_MICRO) :

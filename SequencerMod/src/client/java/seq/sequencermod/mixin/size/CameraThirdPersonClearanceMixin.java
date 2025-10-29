@@ -19,6 +19,9 @@ public abstract class CameraThirdPersonClearanceMixin {
 
     @Inject(method = "clipToSpace(D)D", at = @At("RETURN"), cancellable = true)
     private void sequencer$softClearance(double desired, CallbackInfoReturnable<Double> cir) {
+        // DEBUG_VANILLA_CAMERA отключает все изменения камеры
+        if (seq.sequencermod.size.config.MicroRenderConfig.DEBUG_VANILLA_CAMERA) return;
+
         if (!this.thirdPerson) return;
 
         MinecraftClient mc = MinecraftClient.getInstance();

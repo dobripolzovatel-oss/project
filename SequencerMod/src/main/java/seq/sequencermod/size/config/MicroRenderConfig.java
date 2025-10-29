@@ -8,11 +8,29 @@ public final class MicroRenderConfig {
     // Включено по умолчанию, чтобы гарантированно вернуть рендер мира.
     public static final boolean DEBUG_DISABLE_FRUSTUM_CULLING = true;
 
+    // Принудительно применить чистую ванильную проекцию в мире (near=0.05, far=viewDist+64).
+    // Защищает от других модов, которые могут изменять near/far в getBasicProjectionMatrix.
+    // Включено по умолчанию для изоляции и диагностики проблем рендера.
+    public static final boolean FORCE_VANILLA_WORLD_PROJECTION = true;
+
     // Вообще не трогать near/far в мире (оставляем ваниль) — уже вырублено в нашем миксине.
     public static final boolean APPLY_CUSTOM_NEAR_IN_WORLD = false;
 
     // Малый near только в пассе руки — для чистоты диагностики сейчас выключаем.
     public static final boolean APPLY_CUSTOM_NEAR_IN_HAND  = false;
+
+    // Отключить occlusion culling (диагностический режим, последнее средство).
+    // По умолчанию выключено; включать только если проблема сохраняется после других мер.
+    public static final boolean DEBUG_DISABLE_OCCLUSION = false;
+
+    // Полностью отключить все изменения камеры/FOV (диагностический режим).
+    // При включении отключает: tiny FOV scaling, camera clearance tweaks.
+    public static final boolean DEBUG_VANILLA_CAMERA = false;
+
+    // ====== Подробная диагностика ======
+    // Включить детальные логи near/far/FOV для каждого кадра.
+    // Осторожно: может замедлить игру и наполнить лог-файл.
+    public static final boolean DEBUG_PROJECTION_LOGS = false;
 
     // ====== Порог микромасштаба ======
     public static final float MICRO_HEIGHT_THRESHOLD = 0.10f; // 10 см
@@ -47,7 +65,8 @@ public final class MicroRenderConfig {
     public static final float EYE_NEAR_FRACTION   = 0.02f;
 
     // ====== FOV-скейл ======
-    public static final boolean SCALE_FOV = true;
+    // Временно выключено по умолчанию для изоляции проблем рендера.
+    public static final boolean SCALE_FOV = false;
     public static final float   TINY_THRESHOLD = 0.50f;
     public static final double  MAX_FOV_REDUCTION = 0.25;
 

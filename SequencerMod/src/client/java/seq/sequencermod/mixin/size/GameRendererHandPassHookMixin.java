@@ -75,6 +75,12 @@ public abstract class GameRendererHandPassHookMixin {
             Matrix4f vanilla = new Matrix4f().setPerspective((float)fovRad, aspect, vanillaNear, vanillaFar);
             sequencer$prevProj = new Matrix4f(vanilla);
 
+            if (MicroRenderConfig.DEBUG_PROJECTION_LOGS) {
+                double fovDeg = Math.toDegrees(fovRad);
+                System.out.printf("[HAND] FOV=%.2f° aspect=%.3f near=%.4f far=%.1f viewDist=%.1f%n",
+                    fovDeg, aspect, near, far, getViewDistance());
+            }
+
             Matrix4f handProj = new Matrix4f().setPerspective((float)fovRad, aspect, near, far);
             loadProjectionMatrix(handProj);
             sequencer$handPushed = true;

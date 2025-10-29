@@ -19,9 +19,9 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
 import seq.sequencermod.size.config.MicroRenderConfig;
 
 /**
- * Безопасная проекция: near с учётом ближайшей геометрии (5x5 лучей),
- * но с «стабильным» минимумом, и корректное соблюдение far/near.
- * Прозрачного просмотра через блоки больше нет, и драйвер не падает.
+ * Кастомная проекция только для tiny/микро размеров.
+ * Для обычного роста — ванильная матрица (проблема «всё пропало» была из-за
+ * применения экстремально малого near на нормальном размере).
  */
 @Environment(EnvType.CLIENT)
 @Mixin(GameRenderer.class)
@@ -44,67 +44,72 @@ public abstract class GameRendererScaledNearMixin {
         float aspect = (float) fbw / (float) fbh;
         if (!(aspect > 0.0f) || Float.isInfinite(aspect) || Float.isNaN(aspect)) return;
 
-        // Габарит
+        // Высота хитбокса игрока
         Box bb = p.getBoundingBox();
-        double h = Math.max(1.0e-12, bb.getYLength());
-        float sizeH = (float) h;
+        float sizeH = (float) Math.max(1.0e-12, bb.getYLength());
 
-        // Клампы — «стабильный» минимум
-        final float NEAR_MIN  = 5.0e-5f;   // минимум для стабильности драйвера
-        final float NEAR_MAX  = 0.0050f;
-
-        // База (если рядом ничего нет) — держим минимум
-        float near = NEAR_MIN;
-
-        // Коррекция near по 5x5 лучам (Center + сетка по FOV), но не ниже NEAR_MIN
-        if (sizeH < 0.10f) {
-            try {
-                Camera cam = ((GameRenderer) (Object) this).getCamera();
-                if (cam != null) {
-                    final double fovRad = Math.toRadians(fovDegOriginal);
-                    final double halfVFov = 0.5 * fovRad;
-                    final double halfHFov = Math.atan(Math.tan(halfVFov) * aspect);
-                    double[] grid = new double[] { -1, -0.5, 0, 0.5, 1 };
-
-                    Vec3d eye = cam.getPos();
-                    double basePitch = cam.getPitch();
-                    double baseYaw   = cam.getYaw();
-
-                    final double maxProbe = 1.0;
-                    final double backEps  = 1.0e-3;
-
-                    double minHit = Double.POSITIVE_INFINITY;
-                    for (double py : grid) {
-                        for (double px : grid) {
-                            double pitchDeg = basePitch + Math.toDegrees(halfVFov * py);
-                            double yawDeg   = baseYaw   + Math.toDegrees(halfHFov * px);
-                            Vec3d dir = Vec3d.fromPolar((float) pitchDeg, (float) yawDeg).normalize();
-                            Vec3d start = eye.subtract(dir.multiply(backEps));
-                            Vec3d end   = start.add(dir.multiply(maxProbe + backEps));
-                            HitResult hit = mc.world.raycast(new RaycastContext(
-                                    start, end, RaycastContext.ShapeType.COLLIDER, RaycastContext.FluidHandling.NONE, p));
-                            if (hit != null && hit.getType() != HitResult.Type.MISS) {
-                                double dist = Math.max(0.0, hit.getPos().distanceTo(eye));
-                                if (dist > 0.0 && dist < minHit) minHit = dist;
-                            }
-                        }
-                    }
-                    if (minHit != Double.POSITIVE_INFINITY) {
-                        // Делаем near немного меньше найденной минимальной глубины, но не ниже NEAR_MIN
-                        float fromFrustum = (float) Math.max(NEAR_MIN, minHit * 0.75);
-                        near = Math.max(NEAR_MIN, Math.min(NEAR_MAX, Math.min(near, fromFrustum)));
-                    }
-                }
-            } catch (Throwable ignored) {}
+        // ВАЖНО: для нормального размера не трогаем проекцию вообще — оставляем ванильную
+        if (sizeH >= MicroRenderConfig.TINY_NEAR_THRESHOLD) {
+            // не отменяем — пусть выполнится оригинальный метод
+            return;
         }
 
-        // Far из конфигурации
+        // Клампы near зависят от «насколько маленький» размер
+        final boolean micro = sizeH < 0.005f;
+        final float NEAR_MIN = micro ? 5.0e-5f : MicroRenderConfig.NEAR_MIN_SAFE_TINY;   // 5e-5 для микро, иначе «почти микро»
+        final float NEAR_MAX = micro ? 0.0050f : MicroRenderConfig.NEAR_MAX_SAFE_TINY;
+
+        // База — минимально допустимый
+        float near = NEAR_MIN;
+
+        // Оценка минимальной дистанции до геометрии по сетке лучей (5x5)
+        try {
+            Camera cam = ((GameRenderer) (Object) this).getCamera();
+            if (cam != null) {
+                final double fovRad = Math.toRadians(fovDegOriginal);
+                final double halfVFov = 0.5 * fovRad;
+                final double halfHFov = Math.atan(Math.tan(halfVFov) * aspect);
+                double[] grid = new double[] { -1, -0.5, 0, 0.5, 1 };
+
+                Vec3d eye = cam.getPos();
+                double basePitch = cam.getPitch();
+                double baseYaw   = cam.getYaw();
+
+                final double maxProbe = 1.0;
+                final double backEps  = 1.0e-3;
+
+                double minHit = Double.POSITIVE_INFINITY;
+                for (double py : grid) {
+                    for (double px : grid) {
+                        double pitchDeg = basePitch + Math.toDegrees(halfVFov * py);
+                        double yawDeg   = baseYaw   + Math.toDegrees(halfHFov * px);
+                        Vec3d dir = Vec3d.fromPolar((float) pitchDeg, (float) yawDeg).normalize();
+                        Vec3d start = eye.subtract(dir.multiply(backEps));
+                        Vec3d end   = start.add(dir.multiply(maxProbe + backEps));
+                        HitResult hit = mc.world.raycast(new RaycastContext(
+                                start, end, RaycastContext.ShapeType.COLLIDER, RaycastContext.FluidHandling.NONE, p));
+                        if (hit != null && hit.getType() != HitResult.Type.MISS) {
+                            double dist = Math.max(0.0, hit.getPos().distanceTo(eye));
+                            if (dist > 0.0 && dist < minHit) minHit = dist;
+                        }
+                    }
+                }
+
+                if (minHit != Double.POSITIVE_INFINITY) {
+                    // Берём near немного меньше обнаруженного минимума
+                    float candidate = (float) Math.max(NEAR_MIN, minHit * 0.75);
+                    near = Math.max(NEAR_MIN, Math.min(NEAR_MAX, candidate));
+                }
+            }
+        } catch (Throwable ignored) {}
+
+        // Far — из конфигурации по размеру
         float farBase =
                 (sizeH < 0.005f) ? MicroRenderConfig.FAR_CLIP_MICRO :
                         (sizeH < MicroRenderConfig.TINY_THRESHOLD) ? MicroRenderConfig.FAR_CLIP_TINY :
                                 MicroRenderConfig.FAR_CLIP;
 
-        // Придерживаемся соотношения far/near. Если из‑за минимума far оно всё ещё нарушено — поднимем near.
+        // Контролируем отношение far/near для стабильности
         float maxRatio = Math.max(10_000f, MicroRenderConfig.FAR_NEAR_MAX_RATIO);
 
         float far = Math.max(32.0f, Math.min(farBase, near * maxRatio));
@@ -120,9 +125,9 @@ public abstract class GameRendererScaledNearMixin {
 
         try {
             Matrix4f proj = new Matrix4f().setPerspective(fovRad, aspect, near, far);
-            cir.setReturnValue(proj);
+            cir.setReturnValue(proj); // подменяем только в tiny/микро
         } catch (Throwable t) {
-            // Фолбэк — полностью безопасные значения
+            // Фолбэк: полностью безопасные значения
             float fbNear = 0.05f;
             float fbFar =
                     (sizeH < 0.005f) ? Math.max(256f, MicroRenderConfig.FAR_CLIP_MICRO) :

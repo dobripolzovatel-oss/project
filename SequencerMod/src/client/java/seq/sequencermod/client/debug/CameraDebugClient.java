@@ -93,7 +93,7 @@ public final class CameraDebugClient {
             int fbh = Math.max(1, mc.getWindow().getFramebufferHeight());
             float aspect = (float) fbw / (float) fbh;
             
-            double fov = 70.0; // default, will be overwritten if we can get it
+            double fov = seq.sequencermod.size.config.MicroRenderConfig.DEFAULT_FOV;
             try {
                 var cam = mc.gameRenderer.getCamera();
                 // Пытаемся получить FOV через рефлексию или используем стандартное значение
@@ -102,7 +102,7 @@ public final class CameraDebugClient {
             
             float viewDist = mc.gameRenderer.getViewDistance();
             float vanillaNear = 0.05f;
-            float vanillaFar = Math.max(512f, viewDist + 64f);
+            float vanillaFar = Math.max(512f, viewDist + seq.sequencermod.size.config.MicroRenderConfig.FAR_PLANE_MARGIN);
 
             float x = 6, y = 6, dy = 10;
             var tr = mc.textRenderer;

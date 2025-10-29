@@ -60,7 +60,7 @@ public abstract class GameRendererHandPassHookMixin {
         float eye = Math.max(0.001f, p.getStandingEyeHeight());
         float desiredNear = Math.max(NEAR_MIN, Math.min(NEAR_MAX, eye * MicroRenderConfig.EYE_NEAR_FRACTION));
 
-        float far = Math.max(512f, getViewDistance() + 64f);
+        float far = Math.max(512f, getViewDistance() + MicroRenderConfig.FAR_PLANE_MARGIN);
         far = Math.min(far, MicroRenderConfig.FAR_CLIP_HARD);
 
         float near = desiredNear;
@@ -71,7 +71,7 @@ public abstract class GameRendererHandPassHookMixin {
 
         try {
             float vanillaNear = 0.05f;
-            float vanillaFar  = Math.max(512f, getViewDistance() + 64f);
+            float vanillaFar  = Math.max(512f, getViewDistance() + MicroRenderConfig.FAR_PLANE_MARGIN);
             Matrix4f vanilla = new Matrix4f().setPerspective((float)fovRad, aspect, vanillaNear, vanillaFar);
             sequencer$prevProj = new Matrix4f(vanilla);
 

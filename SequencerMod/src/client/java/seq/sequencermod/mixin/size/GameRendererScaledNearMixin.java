@@ -41,7 +41,7 @@ public abstract class GameRendererScaledNearMixin {
 
             // Чистые ванильные значения
             float near = 0.05f;
-            float far = Math.max(512f, getViewDistance() + 64f);
+            float far = Math.max(512f, getViewDistance() + MicroRenderConfig.FAR_PLANE_MARGIN);
 
             double fovRad = Math.toRadians(fovDegOriginal);
 

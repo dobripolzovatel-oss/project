@@ -60,9 +60,15 @@ public final class MicroRenderConfig {
     public static final float FAR_CLIP       = 4096f;
     public static final float FAR_CLIP_HARD  = 16_384f;
 
+    // Дополнительный запас для far plane за пределами view distance
+    public static final float FAR_PLANE_MARGIN = 64f;
+
     public static final float FAR_NEAR_MAX_RATIO = 200_000f;
     public static final float TINY_NEAR_THRESHOLD = 0.060f; // 6 см
     public static final float EYE_NEAR_FRACTION   = 0.02f;
+    
+    // ====== FOV ======
+    public static final double DEFAULT_FOV = 70.0; // Стандартный FOV в градусах
 
     // ====== FOV-скейл ======
     // Временно выключено по умолчанию для изоляции проблем рендера.

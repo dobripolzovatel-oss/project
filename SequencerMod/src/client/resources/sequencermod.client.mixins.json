@@ -21,7 +21,9 @@
 		"size.CameraThirdPersonClearanceMixin",
 		"size.ClientReachDistanceMixin",
 		"size.GameRendererClampReachMixin",
-		"size.CameraThirdPersonDistanceMixin"
+		"size.CameraThirdPersonDistanceMixin",
+		"size.CameraFirstPersonClearanceMixin",
+		"size.CameraPosAccessor"
 	],
 	"injectors": {
 		"defaultRequire": 1

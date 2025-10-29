@@ -23,6 +23,9 @@ import net.minecraft.util.shape.VoxelShape;
 import net.minecraft.world.World;
 import org.lwjgl.glfw.GLFW;
 
+import static seq.sequencermod.size.config.MicroRenderConfig.DEFAULT_FOV;
+import static seq.sequencermod.size.config.MicroRenderConfig.FAR_PLANE_MARGIN;
+
 @Environment(EnvType.CLIENT)
 public final class CameraDebugClient {
     private static boolean enabled = false;
@@ -93,7 +96,7 @@ public final class CameraDebugClient {
             int fbh = Math.max(1, mc.getWindow().getFramebufferHeight());
             float aspect = (float) fbw / (float) fbh;
             
-            double fov = seq.sequencermod.size.config.MicroRenderConfig.DEFAULT_FOV;
+            double fov = DEFAULT_FOV;
             try {
                 var cam = mc.gameRenderer.getCamera();
                 // Пытаемся получить FOV через рефлексию или используем стандартное значение
@@ -102,7 +105,7 @@ public final class CameraDebugClient {
             
             float viewDist = mc.gameRenderer.getViewDistance();
             float vanillaNear = 0.05f;
-            float vanillaFar = Math.max(512f, viewDist + seq.sequencermod.size.config.MicroRenderConfig.FAR_PLANE_MARGIN);
+            float vanillaFar = Math.max(512f, viewDist + FAR_PLANE_MARGIN);
 
             float x = 6, y = 6, dy = 10;
             var tr = mc.textRenderer;

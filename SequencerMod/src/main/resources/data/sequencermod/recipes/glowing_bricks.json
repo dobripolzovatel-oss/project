@@ -1,8 +1,0 @@
-{
-  "type": "minecraft:crafting_shaped",
-  "pattern": [ "GGG", "G G", "GGG" ],
-  "key": {
-    "G": { "item": "minecraft:glowstone_dust" }
-  },
-  "result": { "item": "sequencermod:glowing_bricks", "count": 1 }
-}

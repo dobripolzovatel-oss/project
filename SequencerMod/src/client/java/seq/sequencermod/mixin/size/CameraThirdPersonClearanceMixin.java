@@ -9,6 +9,7 @@ import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.Shadow;
 import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
+import seq.sequencermod.size.config.MicroRenderConfig;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
 
 @Environment(EnvType.CLIENT)
@@ -19,6 +20,7 @@ public abstract class CameraThirdPersonClearanceMixin {
 
     @Inject(method = "clipToSpace(D)D", at = @At("RETURN"), cancellable = true)
     private void sequencer$softClearance(double desired, CallbackInfoReturnable<Double> cir) {
+        if (MicroRenderConfig.DEBUG_VANILLA_CAMERA) return;
         if (!this.thirdPerson) return;
 
         MinecraftClient mc = MinecraftClient.getInstance();

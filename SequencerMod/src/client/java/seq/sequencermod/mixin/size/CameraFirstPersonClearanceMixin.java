@@ -6,6 +6,7 @@ import net.minecraft.client.MinecraftClient;
 import net.minecraft.client.render.Camera;
 import net.minecraft.client.world.ClientWorld;
 import net.minecraft.entity.Entity;
+import seq.sequencermod.size.config.MicroRenderConfig;
 import net.minecraft.entity.player.PlayerEntity;
 import net.minecraft.util.hit.HitResult;
 import net.minecraft.util.math.Vec3d;
@@ -34,6 +35,8 @@ public abstract class CameraFirstPersonClearanceMixin {
             at = @At("TAIL")
     )
     private void sequencer$ensureFirstPersonClearance(BlockView area, Entity focusedEntity, boolean thirdPerson, boolean inverseView, float tickDelta, CallbackInfo ci) {
+        if (MicroRenderConfig.DEBUG_VANILLA_CAMERA) return;
+
         if (thirdPerson) return;
         if (!(focusedEntity instanceof PlayerEntity p)) return;
 

@@ -31,7 +31,7 @@ glintStrength:0.75
 damageTiltStrength:1.0
 highContrast:false
 gamma:0.5
-renderDistance:9
+renderDistance:14
 simulationDistance:13
 entityDistanceScaling:1.0
 guiScale:0
@@ -127,7 +127,6 @@ key_key.sequencer.camel.sit_toggle:key.keyboard.g
 key_key.sequencer.camel.dash:key.keyboard.r
 key_key.sequencer.camel.cycle_skin:key.keyboard.i
 key_key.sequencer.camel.toggle_saddle:key.keyboard.u
-key_key.sequencermod.camdebug:key.keyboard.c
 soundCategory_master:1.0
 soundCategory_music:0.0
 soundCategory_record:1.0

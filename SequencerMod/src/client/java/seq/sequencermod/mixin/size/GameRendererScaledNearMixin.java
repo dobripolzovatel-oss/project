@@ -19,8 +19,9 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
 import seq.sequencermod.size.config.MicroRenderConfig;
 
 /**
- * Динамический near/far в первом лице с учётом минимума глубины по пирамиде из 5 лучей (центр + 4 угла FOV).
- * Это убирает срезы земли/блоков внизу и по краям кадра при экстремально малых размерах.
+ * Динамический near/far в первом лице с учётом минимума глубины по 9 лучам (центр + 4 угла + 4 середины рёбер).
+ * - Рэйкаст стартует на небольшом смещении позади камеры, чтобы гарантировать пересечение ближайшей грани.
+ * - Ограничение far/near корректно соблюдается: при необходимости понижаем far и/или повышаем near.
  */
 @Environment(EnvType.CLIENT)
 @Mixin(GameRenderer.class)
@@ -31,17 +32,20 @@ public abstract class GameRendererScaledNearMixin {
         MinecraftClient mc = MinecraftClient.getInstance();
         if (mc == null || mc.world == null || mc.getWindow() == null) return;
 
+        // Только 1-е лицо
         Perspective persp = mc.options != null ? mc.options.getPerspective() : Perspective.FIRST_PERSON;
         if (persp == null || !persp.isFirstPerson()) return;
 
         PlayerEntity p = mc.player;
         if (p == null) return;
 
+        // Буфер
         int fbw = Math.max(1, mc.getWindow().getFramebufferWidth());
         int fbh = Math.max(1, mc.getWindow().getFramebufferHeight());
         float aspect = (float) fbw / (float) fbh;
         if (!(aspect > 0.0f) || Float.isInfinite(aspect) || Float.isNaN(aspect)) return;
 
+        // Текущий AABB игрока
         Box bb = p.getBoundingBox();
         double w = Math.max(1.0e-12, bb.getXLength());
         double h = Math.max(1.0e-12, bb.getYLength());
@@ -49,75 +53,102 @@ public abstract class GameRendererScaledNearMixin {
         double minHalfExtent = 0.5 * Math.min(w, Math.min(h, d));
         float sizeH = (float) h;
 
-        final float NEAR_ABS_MIN = 1.0e-6f;
+        // Базовые клампы
+        final float NEAR_ABS_MIN  = 1.0e-6f;
         final float NEAR_SOFT_MIN = 5.0e-5f;
-        final float NEAR_MAX = 0.0050f;
+        final float NEAR_MAX      = 0.0050f;
 
+        // База от размера (если ничего близко, держим мягкий минимум)
         float nearDesired = (float) (minHalfExtent * 0.50);
         float near = Math.max(NEAR_SOFT_MIN, Math.min(NEAR_MAX, nearDesired));
 
-        // Коррекция near по минимальной глубине среди 5 лучей в пределах текущего FOV
-        // Делаем это только для tiny/микро, чтобы не тратить лишние лучи на нормальных размерах
+        // Коррекция near по минимальной дистанции в пределах текущего FOV
         if (sizeH < 0.06f) {
             try {
                 Camera cam = ((GameRenderer) (Object) this).getCamera();
                 if (cam != null) {
-                    double fovRad = Math.toRadians(fovDegOriginal);
-                    double halfVFov = 0.5 * fovRad;
-                    double halfHFov = Math.atan(Math.tan(halfVFov) * aspect);
+                    final double fovRad = Math.toRadians(fovDegOriginal);
+                    final double halfVFov = 0.5 * fovRad;
+                    final double halfHFov = Math.atan(Math.tan(halfVFov) * aspect);
 
-                    // Центр + 4 угла
-                    double[] pitchOffsets = new double[] { 0.0,  +halfVFov, +halfVFov, -halfVFov, -halfVFov };
-                    double[] yawOffsets   = new double[] { 0.0,  -halfHFov, +halfHFov, -halfHFov, +halfHFov };
+                    // 9 направлений: центр, 4 угла, 4 ребра
+                    double[] pitchOff = new double[] {
+                            0.0,
+                            +halfVFov, +halfVFov, -halfVFov, -halfVFov, // углы
+                            +halfVFov, -halfVFov, 0.0,        0.0       // рёбра: вверх/вниз/лево/право
+                    };
+                    double[] yawOff = new double[] {
+                            0.0,
+                            -halfHFov, +halfHFov, -halfHFov, +halfHFov, // углы
+                            0.0,        0.0,        -halfHFov, +halfHFov // рёбра
+                    };
 
-                    Vec3d eye = cam.getPos();
-                    double basePitchDeg = cam.getPitch();
-                    double baseYawDeg   = cam.getYaw();
-                    double maxProbe = 0.6; // до 0.6 блока — хватает для «упора носом» и низа экрана
+                    final Vec3d eye0 = cam.getPos();
+                    final double basePitch = cam.getPitch();
+                    final double baseYaw   = cam.getYaw();
+                    final double maxProbe  = 1.0;     // до 1 блока вперёд
+                    final double backEps   = 1.0e-3;  // отступ назад, чтобы не начинать "в плоскости"
 
                     double minHit = Double.POSITIVE_INFINITY;
 
-                    for (int i = 0; i < pitchOffsets.length; i++) {
-                        double pitchDeg = basePitchDeg + Math.toDegrees(pitchOffsets[i]);
-                        double yawDeg   = baseYawDeg   + Math.toDegrees(yawOffsets[i]);
+                    for (int i = 0; i < pitchOff.length; i++) {
+                        final double pitchDeg = basePitch + Math.toDegrees(pitchOff[i]);
+                        final double yawDeg   = baseYaw   + Math.toDegrees(yawOff[i]);
 
-                        Vec3d dir = Vec3d.fromPolar((float) pitchDeg, (float) yawDeg);
-                        Vec3d end = eye.add(dir.multiply(maxProbe));
+                        Vec3d dir = Vec3d.fromPolar((float) pitchDeg, (float) yawDeg).normalize();
+                        Vec3d start = eye0.subtract(dir.multiply(backEps)); // сместили старт назад
+                        Vec3d end   = start.add(dir.multiply(maxProbe + backEps));
 
                         HitResult hit = mc.world.raycast(new RaycastContext(
-                                eye, end,
+                                start, end,
                                 RaycastContext.ShapeType.COLLIDER,
                                 RaycastContext.FluidHandling.NONE,
                                 p
                         ));
                         if (hit != null && hit.getType() != HitResult.Type.MISS) {
-                            double dist = Math.max(0.0, hit.getPos().distanceTo(eye));
+                            double dist = Math.max(0.0, hit.getPos().distanceTo(eye0)); // измеряем от реального глаза
                             if (dist > 0.0 && dist < minHit) minHit = dist;
                         }
                     }
 
                     if (minHit != Double.POSITIVE_INFINITY) {
-                        float nearFromFrustum = (float) Math.max(NEAR_ABS_MIN, minHit * 0.80);
+                        // Берём 60% от минимальной глубины в фрустуме — более безопасно у самых малых масштабов
+                        float nearFromFrustum = (float) Math.max(NEAR_ABS_MIN, minHit * 0.60);
                         near = Math.max(NEAR_ABS_MIN, Math.min(NEAR_MAX, Math.min(near, nearFromFrustum)));
                     }
                 }
             } catch (Throwable ignored) {
-                // При любой аномалии остаёмся на базовом near
+                // Оставляем базовый near
             }
         }
 
-        // far: базовый + ограничение отношения + жёсткий минимум
+        // База far
         float farBase =
                 (sizeH < 0.005f) ? MicroRenderConfig.FAR_CLIP_MICRO :
                         (sizeH < MicroRenderConfig.TINY_THRESHOLD) ? MicroRenderConfig.FAR_CLIP_TINY :
                                 MicroRenderConfig.FAR_CLIP;
 
-        float far = Math.max(64.0f, Math.max(near * 4.0f, farBase));
+        // Минимальный допустимый far (для стабильности глубины)
+        final float FAR_MIN = 32.0f;
 
+        float far = Math.max(FAR_MIN, Math.max(near * 4.0f, farBase));
+
+        // Корректное соблюдение соотношения far/near
         float maxRatio = Math.max(10_000f, MicroRenderConfig.FAR_NEAR_MAX_RATIO);
-        if (far / near > maxRatio) {
-            far = Math.max(near * maxRatio, 64.0f);
+
+        // Сначала пробуем понизить far, чтобы уложиться в отношение
+        float farByRatio = near * maxRatio;
+        if (far > farByRatio) {
+            far = Math.max(FAR_MIN, farByRatio);
         }
+        // Если всё ещё нарушено (например, упёрлись в FAR_MIN), поднимем near
+        if (far / near > maxRatio) {
+            near = Math.max(near, far / maxRatio);
+            // И пересчитаем страхующие клампы
+            near = Math.max(NEAR_ABS_MIN, Math.min(NEAR_MAX, near));
+        }
+
+        // Гарантия строгого неравенства
         if (!(far > near)) {
             far = near + Math.max(0.01f, near);
         }
@@ -129,7 +160,7 @@ public abstract class GameRendererScaledNearMixin {
             Matrix4f proj = new Matrix4f().setPerspective(fovRad, aspect, near, far);
             cir.setReturnValue(proj);
         } catch (Throwable t) {
-            // Фолбэк на «ванильные» значения
+            // Надёжный фолбэк
             float fbNear = 0.05f;
             float fbFar =
                     (sizeH < 0.005f) ? Math.max(256f, MicroRenderConfig.FAR_CLIP_MICRO) :

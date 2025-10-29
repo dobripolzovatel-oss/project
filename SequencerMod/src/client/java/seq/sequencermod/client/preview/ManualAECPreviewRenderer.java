@@ -105,11 +105,13 @@ public final class ManualAECPreviewRenderer {
 
         ensureFbo(w, h);
 
-        // Capture GL state before offscreen rendering
-        GlStateGuard guard = GlStateGuard.capture();
-        AecPreviewProbe.gl("MAEC FBO: before-offscreen");
-
+        // Capture GL state and perform offscreen rendering with proper cleanup
+        GlStateGuard guard = null;
         try {
+            // Capture GL state before offscreen rendering
+            guard = GlStateGuard.capture();
+            AecPreviewProbe.gl("MAEC FBO: before-offscreen");
+
             // 1) Рисуем в FBO
             PREVIEW_FBO.beginWrite(true);
             AecPreviewProbe.gl("MAEC FBO: after-beginWrite"); // выставляет viewport = w×h
@@ -144,8 +146,10 @@ public final class ManualAECPreviewRenderer {
             AecPreviewProbe.out("MAEC FBO: blit end");
         } finally {
             // Restore captured GL state
-            guard.restore();
-            AecPreviewProbe.gl("MAEC FBO: after-restore");
+            if (guard != null) {
+                guard.restore();
+                AecPreviewProbe.gl("MAEC FBO: after-restore");
+            }
             AecPreviewProbe.out("MAEC FBO: leave");
         }
     }

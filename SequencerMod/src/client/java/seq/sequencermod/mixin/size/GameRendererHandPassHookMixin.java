@@ -91,18 +91,17 @@ public abstract class GameRendererHandPassHookMixin {
     @Inject(method = "renderHand", at = @At("RETURN"))
     private void sequencer$exitHand(net.minecraft.client.util.math.MatrixStack matrices, Camera camera, float tickDelta, CallbackInfo ci) {
         try {
-            if (sequencer$handPushed) {
+            if (sequencer$handPushed && sequencer$prevProj != null) {
                 try {
-                    if (sequencer$prevProj != null) {
-                        loadProjectionMatrix(sequencer$prevProj);
-                    }
+                    loadProjectionMatrix(sequencer$prevProj);
                 } catch (Throwable ignored) {
-                } finally {
-                    sequencer$handPushed = false;
-                    sequencer$prevProj = null;
+                    // Ignore projection restoration errors
                 }
             }
         } finally {
+            // Always clean up state flags
+            sequencer$handPushed = false;
+            sequencer$prevProj = null;
             // Always mark that we're exiting the hand pass, even if an exception occurred
             RenderPassFlags.exitHand();
         }

@@ -3,10 +3,6 @@ pluginManagement {
 		maven {
 			name = 'Fabric'
 			url = 'https://maven.fabricmc.net/'
-			content {
-				includeGroup 'net.fabricmc'
-				includeGroup 'fabric-loom'
-			}
 		}
 		mavenCentral()
 		gradlePluginPortal()

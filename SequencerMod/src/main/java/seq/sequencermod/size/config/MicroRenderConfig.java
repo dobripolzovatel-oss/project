@@ -3,11 +3,18 @@ package seq.sequencermod.size.config;
 public final class MicroRenderConfig {
     private MicroRenderConfig() {}
 
-    // ====== ГЛОБАЛЬНЫЕ ПЕРЕКЛЮЧАТЕЛИ ======
-    public static final boolean APPLY_CUSTOM_NEAR_IN_WORLD = false; // мир — ваниль
-    public static final boolean APPLY_CUSTOM_NEAR_IN_HAND  = true;  // малый near только в руке
+    // ====== Диагностика/аварийные флаги ======
+    // Полностью отключить фрустум-куллинг на клиенте (диагностический режим).
+    // Включено по умолчанию, чтобы гарантированно вернуть рендер мира.
+    public static final boolean DEBUG_DISABLE_FRUSTUM_CULLING = true;
 
-    // ====== Пороги микромасштаба ======
+    // Вообще не трогать near/far в мире (оставляем ваниль) — уже вырублено в нашем миксине.
+    public static final boolean APPLY_CUSTOM_NEAR_IN_WORLD = false;
+
+    // Малый near только в пассе руки — для чистоты диагностики сейчас выключаем.
+    public static final boolean APPLY_CUSTOM_NEAR_IN_HAND  = false;
+
+    // ====== Порог микромасштаба ======
     public static final float MICRO_HEIGHT_THRESHOLD = 0.10f; // 10 см
 
     // ====== near для tiny/micro ======
@@ -17,7 +24,7 @@ public final class MicroRenderConfig {
     public static final float NEAR_MIN_TINY = 0.010f; // 1 см
     public static final float NEAR_MAX_TINY = 0.040f; // 4 см
 
-    // Алиасы для SizeRules (исправляет "Cannot resolve symbol ... SAFE_TINY")
+    // Алиасы для SizeRules
     public static final float NEAR_MIN_SAFE_TINY = NEAR_MIN_TINY;
     public static final float NEAR_MAX_SAFE_TINY = NEAR_MAX_TINY;
 
@@ -25,7 +32,7 @@ public final class MicroRenderConfig {
     public static final float NEAR_MIN_SAFE = 0.050f;
     public static final float NEAR_MAX_SAFE = 0.200f;
 
-    // Для пасса руки (можно чуть агрессивнее)
+    // Для пасса руки (оставим на будущее, сейчас выключено APPLY_CUSTOM_NEAR_IN_HAND)
     public static final float HAND_NEAR_MIN = 0.0025f;
     public static final float HAND_NEAR_MAX = 0.020f;
 

@@ -18,10 +18,6 @@ import seq.sequencermod.size.PlayerClientSizes;
 import seq.sequencermod.size.PlayerSizeData;
 import seq.sequencermod.size.config.MicroRenderConfig;
 
-/**
- * Малый near применяем только вокруг рендера руки/предмета в 1-м лице.
- * Это не влияет на фрустум рендера мира и не ломает видимость чанков.
- */
 @Environment(EnvType.CLIENT)
 @Mixin(GameRenderer.class)
 public abstract class GameRendererHandPassHookMixin {
@@ -30,7 +26,6 @@ public abstract class GameRendererHandPassHookMixin {
     @Shadow public abstract float getViewDistance();
     @Shadow public abstract Camera getCamera();
 
-    // Доступ к приватному GameRenderer#getFov(Camera, float, boolean)
     @Invoker("getFov")
     protected abstract double sequencer$invokeGetFov(Camera camera, float tickDelta, boolean changingFov);
 
@@ -39,16 +34,14 @@ public abstract class GameRendererHandPassHookMixin {
 
     @Inject(method = "renderHand", at = @At("HEAD"))
     private void sequencer$enterHand(net.minecraft.client.util.math.MatrixStack matrices, Camera camera, float tickDelta, CallbackInfo ci) {
-        if (!MicroRenderConfig.APPLY_CUSTOM_NEAR_IN_HAND) return;
+        if (!MicroRenderConfig.APPLY_CUSTOM_NEAR_IN_HAND) return; // сейчас выключено
 
         MinecraftClient mc = MinecraftClient.getInstance();
         if (mc == null || mc.world == null || mc.player == null) return;
 
-        // Только 1-е лицо
         Perspective persp = mc.options != null ? mc.options.getPerspective() : Perspective.FIRST_PERSON;
         if (persp == null || !persp.isFirstPerson()) return;
 
-        // Проверяем рост
         PlayerEntity p = mc.player;
         PlayerSizeData data = PlayerClientSizes.get(p.getUuid());
         if (data == null || !(data.height > 0f)) return;
@@ -57,20 +50,16 @@ public abstract class GameRendererHandPassHookMixin {
         int fbw = Math.max(1, mc.getWindow().getFramebufferWidth());
         int fbh = Math.max(1, mc.getWindow().getFramebufferHeight());
         float aspect = (float) fbw / (float) fbh;
-
         double fovRad = Math.toRadians(this.sequencer$invokeGetFov(camera, tickDelta, false));
         if (!(aspect > 0f) || !(fovRad > 0d)) return;
 
-        // Режимы tiny/micro
         final boolean ultraMicro = data.height < 0.01f;
         final float NEAR_MIN = ultraMicro ? MicroRenderConfig.HAND_NEAR_MIN : MicroRenderConfig.NEAR_MIN_TINY;
         final float NEAR_MAX = ultraMicro ? MicroRenderConfig.HAND_NEAR_MAX : MicroRenderConfig.NEAR_MAX_TINY;
 
-        // Берём near от высоты глаз
         float eye = Math.max(0.001f, p.getStandingEyeHeight());
         float desiredNear = Math.max(NEAR_MIN, Math.min(NEAR_MAX, eye * MicroRenderConfig.EYE_NEAR_FRACTION));
 
-        // Far для руки из видимой дистанции (в блоках) + запас
         float far = Math.max(512f, getViewDistance() + 64f);
         far = Math.min(far, MicroRenderConfig.FAR_CLIP_HARD);
 
@@ -81,7 +70,6 @@ public abstract class GameRendererHandPassHookMixin {
         if (!(far > near)) return;
 
         try {
-            // Сохраняем "ванильную" матрицу для восстановления
             float vanillaNear = 0.05f;
             float vanillaFar  = Math.max(512f, getViewDistance() + 64f);
             Matrix4f vanilla = new Matrix4f().setPerspective((float)fovRad, aspect, vanillaNear, vanillaFar);

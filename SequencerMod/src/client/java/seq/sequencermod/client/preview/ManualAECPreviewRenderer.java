@@ -24,6 +24,7 @@ import net.minecraft.util.Identifier;
 import net.minecraft.util.math.RotationAxis;
 import org.joml.Matrix3f;
 import org.joml.Matrix4f;
+import org.lwjgl.opengl.GL11;
 
 /**
  * Превью‑рендер AEC:
@@ -36,6 +37,49 @@ public final class ManualAECPreviewRenderer {
     private ManualAECPreviewRenderer() {}
 
     private static final Identifier WHITE_TEX = new Identifier("minecraft", "textures/misc/white.png");
+
+    /**
+     * GL state guard to capture and restore viewport, scissor test, and scissor box.
+     * Prevents GL state leaks that cause the world to render in a tiny rectangle.
+     */
+    private static class GlStateGuard {
+        private final int[] viewport = new int[4];
+        private final int[] scissorBox = new int[4];
+        private boolean scissorTestEnabled;
+
+        /**
+         * Captures current GL viewport, scissor test state, and scissor box.
+         */
+        void capture() {
+            GL11.glGetIntegerv(GL11.GL_VIEWPORT, viewport);
+            scissorTestEnabled = GL11.glIsEnabled(GL11.GL_SCISSOR_TEST);
+            GL11.glGetIntegerv(GL11.GL_SCISSOR_BOX, scissorBox);
+            
+            AecPreviewProbe.out("GlStateGuard: captured viewport=[%d,%d,%d,%d] scissor=%s box=[%d,%d,%d,%d]",
+                viewport[0], viewport[1], viewport[2], viewport[3],
+                scissorTestEnabled ? "enabled" : "disabled",
+                scissorBox[0], scissorBox[1], scissorBox[2], scissorBox[3]);
+        }
+
+        /**
+         * Restores GL viewport, scissor test state, and scissor box to captured values.
+         */
+        void restore() {
+            RenderSystem.viewport(viewport[0], viewport[1], viewport[2], viewport[3]);
+            
+            if (scissorTestEnabled) {
+                GL11.glEnable(GL11.GL_SCISSOR_TEST);
+                GL11.glScissor(scissorBox[0], scissorBox[1], scissorBox[2], scissorBox[3]);
+            } else {
+                GL11.glDisable(GL11.GL_SCISSOR_TEST);
+            }
+            
+            AecPreviewProbe.out("GlStateGuard: restored viewport=[%d,%d,%d,%d] scissor=%s box=[%d,%d,%d,%d]",
+                viewport[0], viewport[1], viewport[2], viewport[3],
+                scissorTestEnabled ? "enabled" : "disabled",
+                scissorBox[0], scissorBox[1], scissorBox[2], scissorBox[3]);
+        }
+    }
 
     // ========= OFFSCREEN → BLIT =========
 
@@ -70,35 +114,52 @@ public final class ManualAECPreviewRenderer {
 
         ensureFbo(w, h);
 
-        // 1) Рисуем в FBO
-        PREVIEW_FBO.beginWrite(true);
-        AecPreviewProbe.gl("MAEC FBO: beginWrite"); // выставляет viewport = w×h
+        // Capture GL state before offscreen rendering to prevent state leaks
+        GlStateGuard guard = new GlStateGuard();
+        guard.capture();
+        
         try {
-            RenderSystem.clearColor(0f, 0f, 0f, 0f);
-            // GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT
-            RenderSystem.clear(0x4100, MinecraftClient.IS_SYSTEM_MAC);
+            // 1) Рисуем в FBO
+            PREVIEW_FBO.beginWrite(true);
+            AecPreviewProbe.gl("MAEC FBO: beginWrite"); // выставляет viewport = w×h
+            
+            // Disable scissor test for offscreen rendering to avoid clipping
+            GL11.glDisable(GL11.GL_SCISSOR_TEST);
+            
+            try {
+                RenderSystem.clearColor(0f, 0f, 0f, 0f);
+                // GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT
+                RenderSystem.clear(0x4100, MinecraftClient.IS_SYSTEM_MAC);
 
-            MatrixStack ms = new MatrixStack();
-            float cx = w * 0.5f;
-            float cy = h * 0.5f;
-            float pixelsPerUnit = Math.min(w, h) * 0.42f;
+                MatrixStack ms = new MatrixStack();
+                float cx = w * 0.5f;
+                float cy = h * 0.5f;
+                float pixelsPerUnit = Math.min(w, h) * 0.42f;
 
-            ms.push();
-            ms.translate(cx, cy, 0f);
-            ms.scale(pixelsPerUnit, pixelsPerUnit, pixelsPerUnit);
-            render(ms, null, aec, tickDelta, style);
-            ms.pop();
-        } finally {
-            PREVIEW_FBO.endWrite();
-            // вернуть viewport окна
+                ms.push();
+                ms.translate(cx, cy, 0f);
+                ms.scale(pixelsPerUnit, pixelsPerUnit, pixelsPerUnit);
+                render(ms, null, aec, tickDelta, style);
+                ms.pop();
+            } finally {
+                PREVIEW_FBO.endWrite();
+            }
+            
+            // 2) Explicitly bind main framebuffer and set viewport to window size
+            mc.getFramebuffer().beginWrite(true);
             RenderSystem.viewport(0, 0, window.getFramebufferWidth(), window.getFramebufferHeight());
-        }
+            AecPreviewProbe.gl("MAEC FBO: after main FB bind");
 
-        // 2) Блитим содержимое FBO в прямоугольник GUI
-        AecPreviewProbe.out("MAEC FBO: blit begin");
-        blitFbo(ctx, PREVIEW_FBO, x, y, w, h);
-        AecPreviewProbe.out("MAEC FBO: blit end");
-        AecPreviewProbe.out("MAEC FBO: leave");
+            // 3) Блитим содержимое FBO в прямоугольник GUI
+            AecPreviewProbe.out("MAEC FBO: blit begin");
+            blitFbo(ctx, PREVIEW_FBO, x, y, w, h);
+            AecPreviewProbe.out("MAEC FBO: blit end");
+        } finally {
+            // Always restore GL state to prevent leaks
+            guard.restore();
+            AecPreviewProbe.gl("MAEC FBO: after restore");
+            AecPreviewProbe.out("MAEC FBO: leave");
+        }
     }
 
     // Ручной блит color‑attachment FBO в прямоугольник GUI

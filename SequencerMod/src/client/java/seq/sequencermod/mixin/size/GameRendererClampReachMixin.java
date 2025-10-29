@@ -11,6 +11,7 @@ import net.minecraft.util.hit.HitResult;
 import net.minecraft.util.math.BlockPos;
 import net.minecraft.util.math.Direction;
 import net.minecraft.util.math.Vec3d;
+import org.spongepowered.asm.mixin.Final;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.Shadow;
 import org.spongepowered.asm.mixin.injection.At;
@@ -27,7 +28,7 @@ import seq.sequencermod.size.util.ReachCalc;
 @Mixin(GameRenderer.class)
 public abstract class GameRendererClampReachMixin {
 
-    @Shadow private Camera camera;
+    @Shadow @Final private Camera camera;
 
     @Inject(method = "updateTargetedEntity(F)V", at = @At("TAIL"))
     private void sequencer$clampReach(float tickDelta, CallbackInfo ci) {

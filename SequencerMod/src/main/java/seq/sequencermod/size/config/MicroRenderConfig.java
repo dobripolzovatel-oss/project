@@ -1,17 +1,59 @@
 package seq.sequencermod.size.config;
 
+/**
+ * Configuration constants for micro-scale rendering adjustments.
+ * <p>
+ * <b>Rationale:</b> When players are scaled to tiny/micro sizes (height &lt; 0.1m),
+ * vanilla projection near/far planes can cause visual artifacts. However, modifying
+ * the projection matrix for the main world rendering pass breaks frustum culling,
+ * causing most of the world to disappear (only sky visible, or massive voids).
+ * <p>
+ * <b>Solution:</b> By default, this mod behaves exactly like vanilla for world rendering.
+ * Optional tweaks are available for advanced users:
+ * <ul>
+ *   <li>{@link #APPLY_CUSTOM_NEAR_IN_WORLD} - allows projection changes in world pass (DANGEROUS, off by default)</li>
+ *   <li>{@link #APPLY_CUSTOM_NEAR_IN_HAND} - allows safe near-plane adjustments only for hand rendering (off by default)</li>
+ *   <li>{@link #DEBUG_DISABLE_FRUSTUM_CULLING} - diagnostic bypass of frustum culling (off by default)</li>
+ * </ul>
+ * <p>
+ * With all flags at their defaults (false), the game renders identically to vanilla.
+ */
 public final class MicroRenderConfig {
     private MicroRenderConfig() {}
 
     // ====== Диагностика/аварийные флаги ======
-    // Полностью отключить фрустум-куллинг на клиенте (диагностический режим).
-    // Включено по умолчанию, чтобы гарантированно вернуть рендер мира.
-    public static final boolean DEBUG_DISABLE_FRUSTUM_CULLING = true;
+    /**
+     * DEBUG ONLY: Completely disable frustum culling on the client.
+     * <p>
+     * When enabled, all chunks/entities are rendered regardless of camera frustum.
+     * This helps verify that disappearing terrain is caused by incorrect culling
+     * rather than other issues. Should NEVER be enabled in production/normal gameplay.
+     * <p>
+     * <b>Default: false</b> (vanilla behavior)
+     */
+    public static final boolean DEBUG_DISABLE_FRUSTUM_CULLING = false;
 
-    // Вообще не трогать near/far в мире (оставляем ваниль) — уже вырублено в нашем миксине.
+    /**
+     * Enable custom near/far plane projection modifications for the main world rendering pass.
+     * <p>
+     * <b>WARNING:</b> Changing the projection during world rendering breaks frustum culling
+     * assumptions, causing most chunks to be incorrectly rejected. This results in
+     * "empty sky" or massive terrain voids. Only enable this if you fully understand
+     * the implications and have modified the frustum calculation accordingly.
+     * <p>
+     * <b>Default: false</b> (vanilla behavior - no projection changes)
+     */
     public static final boolean APPLY_CUSTOM_NEAR_IN_WORLD = false;
 
-    // Малый near только в пассе руки — для чистоты диагностики сейчас выключаем.
+    /**
+     * Enable custom near-plane adjustments for the hand rendering pass only (first-person view).
+     * <p>
+     * When enabled, the projection is safely saved/restored around the hand rendering pass,
+     * allowing closer near planes for tiny players without affecting world rendering or culling.
+     * The near plane is clamped to safe values and the far/near ratio is bounded.
+     * <p>
+     * <b>Default: false</b> (vanilla behavior - no hand pass modifications)
+     */
     public static final boolean APPLY_CUSTOM_NEAR_IN_HAND  = false;
 
     // ====== Порог микромасштаба ======

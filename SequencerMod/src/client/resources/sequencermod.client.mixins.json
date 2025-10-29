@@ -23,7 +23,8 @@
 		"size.GameRendererClampReachMixin",
 		"size.CameraThirdPersonDistanceMixin",
 		"size.CameraFirstPersonClearanceMixin",
-		"size.CameraPosAccessor"
+		"size.CameraPosAccessor",
+		"size.FrustumBypassMixin"
 	],
 	"injectors": {
 		"defaultRequire": 1

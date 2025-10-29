@@ -38,6 +38,9 @@ public abstract class GameRendererTinyFovMixin {
     @Inject(method = "getFov(Lnet/minecraft/client/render/Camera;FZ)D",
             at = @At("RETURN"), cancellable = true)
     private void sequencer$softFov(Camera camera, float tickDelta, boolean changingFov, CallbackInfoReturnable<Double> cir) {
+        // DEBUG_VANILLA_CAMERA отключает все изменения камеры/FOV
+        if (MicroRenderConfig.DEBUG_VANILLA_CAMERA) return;
+
         // Конфиг можно быстро выключить целиком
         if (!MicroRenderConfig.SCALE_FOV) return;
 

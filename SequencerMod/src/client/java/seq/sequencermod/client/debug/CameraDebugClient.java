@@ -88,12 +88,32 @@ public final class CameraDebugClient {
             Double topYBelow = topY(mc.world, eyePos.down());
             Perspective persp = mc.options.getPerspective();
 
+            // Вычисляем проекционные параметры
+            int fbw = Math.max(1, mc.getWindow().getFramebufferWidth());
+            int fbh = Math.max(1, mc.getWindow().getFramebufferHeight());
+            float aspect = (float) fbw / (float) fbh;
+            
+            double fov = 70.0; // default, will be overwritten if we can get it
+            try {
+                var cam = mc.gameRenderer.getCamera();
+                // Пытаемся получить FOV через рефлексию или используем стандартное значение
+                fov = mc.options.getFov().getValue().doubleValue();
+            } catch (Exception ignored) {}
+            
+            float viewDist = mc.gameRenderer.getViewDistance();
+            float vanillaNear = 0.05f;
+            float vanillaFar = Math.max(512f, viewDist + 64f);
+
             float x = 6, y = 6, dy = 10;
             var tr = mc.textRenderer;
             context.drawText(tr, Text.literal(String.format("CamDebug: %s  (%s)", enabled, persp)), (int)x, (int)y, 0xFFFF00, true); y += dy;
             context.drawText(tr, Text.literal(String.format("camY=%.5f  eyeY=%.5f  h=%.5f", camY, p.getStandingEyeHeight(), p.getDimensions(p.getPose()).height)), (int)x, (int)y, 0xFFFFFF, true); y += dy;
             if (topYCur != null)   { context.drawText(tr, Text.literal(String.format("topY(cur)=%.5f  d=%.5f",   topYCur,   camY - topYCur)),   (int)x, (int)y, 0xCCCCFF, true); y += dy; }
             if (topYBelow != null) { context.drawText(tr, Text.literal(String.format("topY(below)=%.5f  d=%.5f", topYBelow, camY - topYBelow)), (int)x, (int)y, 0xCCCCFF, true); y += dy; }
+            
+            // Проекционные параметры
+            context.drawText(tr, Text.literal(String.format("FOV=%.1f°  aspect=%.3f  viewDist=%.1f", fov, aspect, viewDist)), (int)x, (int)y, 0xFFFFAA, true); y += dy;
+            context.drawText(tr, Text.literal(String.format("[WORLD] near=%.4f  far=%.1f", vanillaNear, vanillaFar)), (int)x, (int)y, 0xAAFFAA, true); y += dy;
         });
     }
 

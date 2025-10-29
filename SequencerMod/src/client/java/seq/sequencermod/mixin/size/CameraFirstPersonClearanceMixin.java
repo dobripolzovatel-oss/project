@@ -34,6 +34,9 @@ public abstract class CameraFirstPersonClearanceMixin {
             at = @At("TAIL")
     )
     private void sequencer$ensureFirstPersonClearance(BlockView area, Entity focusedEntity, boolean thirdPerson, boolean inverseView, float tickDelta, CallbackInfo ci) {
+        // DEBUG_VANILLA_CAMERA отключает все изменения камеры
+        if (seq.sequencermod.size.config.MicroRenderConfig.DEBUG_VANILLA_CAMERA) return;
+
         if (thirdPerson) return;
         if (!(focusedEntity instanceof PlayerEntity p)) return;
 

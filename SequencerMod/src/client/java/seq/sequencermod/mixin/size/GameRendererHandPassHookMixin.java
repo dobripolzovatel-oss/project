@@ -14,6 +14,7 @@ import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 import org.spongepowered.asm.mixin.gen.Invoker;
+import seq.sequencermod.render.RenderPassFlags;
 import seq.sequencermod.size.PlayerClientSizes;
 import seq.sequencermod.size.PlayerSizeData;
 import seq.sequencermod.size.config.MicroRenderConfig;
@@ -30,11 +31,13 @@ public abstract class GameRendererHandPassHookMixin {
     protected abstract double sequencer$invokeGetFov(Camera camera, float tickDelta, boolean changingFov);
 
     private Matrix4f sequencer$prevProj = null;
-    private boolean  sequencer$handPushed = false;
 
     @Inject(method = "renderHand", at = @At("HEAD"))
     private void sequencer$enterHand(net.minecraft.client.util.math.MatrixStack matrices, Camera camera, float tickDelta, CallbackInfo ci) {
-        if (!MicroRenderConfig.APPLY_CUSTOM_NEAR_IN_HAND) return; // сейчас выключено
+        // Явно помечаем hand‑pass (даже если конфиг tiny-NEAR сейчас выключен)
+        RenderPassFlags.enterHand();
+        // Ниже — существующая логика (если включите APPLY_CUSTOM_NEAR_IN_HAND)
+        if (!MicroRenderConfig.APPLY_CUSTOM_NEAR_IN_HAND) return;
 
         MinecraftClient mc = MinecraftClient.getInstance();
         if (mc == null || mc.world == null || mc.player == null) return;
@@ -65,36 +68,19 @@ public abstract class GameRendererHandPassHookMixin {
 
         float near = desiredNear;
         if (far / near > MicroRenderConfig.FAR_NEAR_MAX_RATIO) {
-            near = Math.max(NEAR_MIN, far / MicroRenderConfig.FAR_NEAR_MAX_RATIO);
+            near = far / MicroRenderConfig.FAR_NEAR_MAX_RATIO;
         }
-        if (!(far > near)) return;
 
-        try {
-            float vanillaNear = 0.05f;
-            float vanillaFar  = Math.max(512f, getViewDistance() + 64f);
-            Matrix4f vanilla = new Matrix4f().setPerspective((float)fovRad, aspect, vanillaNear, vanillaFar);
-            sequencer$prevProj = new Matrix4f(vanilla);
-
-            Matrix4f handProj = new Matrix4f().setPerspective((float)fovRad, aspect, near, far);
-            loadProjectionMatrix(handProj);
-            sequencer$handPushed = true;
-        } catch (Throwable ignored) {
-            sequencer$handPushed = false;
-            sequencer$prevProj = null;
-        }
+        sequencer$prevProj = new Matrix4f(); // при необходимости — сохранить
+        Matrix4f proj = new Matrix4f().setPerspective((float) fovRad, aspect, near, far);
+        loadProjectionMatrix(proj);
     }
 
-    @Inject(method = "renderHand", at = @At("RETURN"))
+    @Inject(method = "renderHand", at = @At("TAIL"))
     private void sequencer$exitHand(net.minecraft.client.util.math.MatrixStack matrices, Camera camera, float tickDelta, CallbackInfo ci) {
-        if (!sequencer$handPushed) return;
-        try {
-            if (sequencer$prevProj != null) {
-                loadProjectionMatrix(sequencer$prevProj);
-            }
-        } catch (Throwable ignored) {
-        } finally {
-            sequencer$handPushed = false;
-            sequencer$prevProj = null;
-        }
+        // Гарантированно снимаем флаг hand‑pass
+        RenderPassFlags.exitHand();
+        // Если хотели возвращать матрицу — делайте это здесь (по текущему коду не требуется).
+        sequencer$prevProj = null;
     }
 }

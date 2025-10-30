@@ -1,31 +1,37 @@
 {
-	"required": true,
-	"minVersion": "0.8.5",
-	"package": "seq.sequencermod.mixin",
-	"refmap": "sequencermod.refmap.json",
-	"compatibilityLevel": "JAVA_17",
-	"client": [
-		"morph.PlayerEntityRendererMixin",
-		"morph.PlayerShadowMixin",
-		"size.ClientPlayerDimensionsMixin",
-		"size.VisibilityBoxMixin",
-		"size.HitboxEyeBoxMixin",
-		"size.PlayerAlwaysRenderTinyMixin",
-		"size.PlayerEyeHeightClientMixin",
-		"size.EntityInsideWallTinyBypassClientMixin",
-		"size.InWallOverlayBypassMixin",
-		"size.GameRendererScaledNearMixin",
-		"size.GameRendererTinyBobbingMixin",
-		"size.GameRendererTinyHurtTiltMixin",
-		"size.GameRendererHandPassHookMixin",
-		"size.CameraThirdPersonClearanceMixin",
-		"size.ClientReachDistanceMixin",
-		"size.GameRendererClampReachMixin",
-		"size.CameraThirdPersonDistanceMixin",
-		"size.CameraFirstPersonClearanceMixin",
-		"size.CameraPosAccessor"
-	],
-	"injectors": {
-		"defaultRequire": 1
-	}
+  "required": true,
+  "minVersion": "0.8.5",
+  "package": "seq.sequencermod.mixin",
+  "refmap": "sequencermod.refmap.json",
+  "compatibilityLevel": "JAVA_17",
+  "client": [
+    "morph.PlayerEntityRendererMixin",
+    "morph.PlayerShadowMixin",
+    "size.ClientPlayerDimensionsMixin",
+    "size.VisibilityBoxMixin",
+    "size.HitboxEyeBoxMixin",
+    "size.PlayerAlwaysRenderTinyMixin",
+    "size.PlayerEyeHeightClientMixin",
+    "size.EntityInsideWallTinyBypassClientMixin",
+    "size.InWallOverlayBypassMixin",
+    "size.GameRendererScaledNearMixin",
+    "size.GameRendererTinyBobbingMixin",
+    "size.GameRendererTinyHurtTiltMixin",
+    "size.GameRendererHandPassHookMixin",
+    "size.CameraThirdPersonClearanceMixin",
+    "size.ClientReachDistanceMixin",
+    "size.GameRendererClampReachMixin",
+    "size.CameraThirdPersonDistanceMixin",
+    "size.CameraFirstPersonClearanceMixin",
+    "size.CameraPosAccessor",
+
+    "accessor.CameraAccessor",
+    "accessor.PlayerEntityAccessor",
+    "accessor.EntityAccessor",
+    "accessor.EntityRenderDispatcherAccessor",
+    "accessor.CamelEntityAccessor"
+  ],
+  "injectors": {
+    "defaultRequire": 1
+  }
 }

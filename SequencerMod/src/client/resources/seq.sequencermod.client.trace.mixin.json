@@ -1,0 +1,16 @@
+{
+  "required": false,
+  "minVersion": "0.8",
+  "package": "seq.sequencermod.client.trace.mixin",
+  "compatibilityLevel": "JAVA_17",
+  "client": [
+    "MixinMinecraftClient",
+    "MixinGameRenderer",
+    "MixinScreen",
+    "MixinEntityRenderDispatcher",
+    "MixinElement"
+  ],
+  "injectors": {
+    "defaultRequire": 1
+  }
+}

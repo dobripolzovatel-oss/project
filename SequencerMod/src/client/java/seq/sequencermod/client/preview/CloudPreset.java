@@ -42,7 +42,6 @@ public enum CloudPreset {
     DRAGON_BREATH(
             ManualAECPreviewRenderer.Style.builder()
                     .name("Dragon's Breath")
-                    .swirlFreq(6)
                     .edgeWobble(0.06f)
                     .puffCountMul(1.15f)
                     .renderPotionSprites(false)
@@ -61,7 +60,6 @@ public enum CloudPreset {
     CUSTOM(
             ManualAECPreviewRenderer.Style.builder()
                     .name("Custom")
-                    .swirlFreq(8)
                     .edgeWobble(0.05f)
                     .puffCountMul(1.0f)
                     .renderPotionSprites(false)
@@ -94,35 +92,39 @@ public enum CloudPreset {
 
     public ManualAECPreviewRenderer.Style previewStyle(@Nullable Custom customOverride) {
         if (this != CUSTOM || customOverride == null) return previewStyle;
-        return previewStyle.toBuilder()
+
+        var s = previewStyle;
+        var b = ManualAECPreviewRenderer.Style.builder()
+                .name(s.name)
                 .tintOverride(customOverride.previewTintOverride != null
                         ? customOverride.previewTintOverride
-                        : previewStyle.tintOverride)
+                        : s.tintOverride)
                 .puffCountMul(customOverride.previewPuffMul > 0f
                         ? customOverride.previewPuffMul
-                        : previewStyle.puffCountMul)
+                        : s.puffCountMul)
                 .edgeWobble(customOverride.previewEdgeWobble >= 0f
                         ? customOverride.previewEdgeWobble
-                        : previewStyle.edgeWobble)
+                        : s.edgeWobble)
                 .renderPotionSprites(customOverride.previewUsePotionSprites != null
                         ? customOverride.previewUsePotionSprites
-                        : previewStyle.renderPotionSprites)
+                        : s.renderPotionSprites)
                 .renderBaseDisk(customOverride.previewRenderBaseDisk != null
                         ? customOverride.previewRenderBaseDisk
-                        : previewStyle.renderBaseDisk)
+                        : s.renderBaseDisk)
                 .renderSoftPuffs(customOverride.previewRenderSoftPuffs != null
                         ? customOverride.previewRenderSoftPuffs
-                        : previewStyle.renderSoftPuffs)
+                        : s.renderSoftPuffs)
                 .spriteGrid(customOverride.previewSpriteGrid > 0
                         ? customOverride.previewSpriteGrid
-                        : previewStyle.spriteGrid)
+                        : s.spriteGrid)
                 .spriteDensity(customOverride.previewSpriteDensity > 0f
                         ? customOverride.previewSpriteDensity
-                        : previewStyle.spriteDensity)
+                        : s.spriteDensity)
                 .spriteAlpha(customOverride.previewSpriteAlpha > 0f
                         ? customOverride.previewSpriteAlpha
-                        : previewStyle.spriteAlpha)
-                .build();
+                        : s.spriteAlpha);
+
+        return b.build();
     }
 
     public abstract void applyToEntity(AreaEffectCloudEntity aec, @Nullable Custom custom);

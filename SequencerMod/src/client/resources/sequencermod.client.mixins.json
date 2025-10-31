@@ -23,7 +23,12 @@
 		"size.GameRendererClampReachMixin",
 		"size.CameraThirdPersonDistanceMixin",
 		"size.CameraFirstPersonClearanceMixin",
-		"size.CameraPosAccessor"
+		"size.CameraPosAccessor",
+		"accessor.CameraAccessor",
+		"accessor.PlayerEntityAccessor",
+		"accessor.EntityAccessor",
+		"accessor.EntityRenderDispatcherAccessor",
+		"accessor.CamelEntityAccessor"
 	],
 	"injectors": {
 		"defaultRequire": 1

@@ -17,7 +17,8 @@
 
 	"mixins": [
 		"sequencermod.mixins.json",
-		"sequencermod.client.mixins.json"
+		"sequencermod.client.mixins.json",
+		"seq.sequencermod.client.trace.mixin.json"
 	],
 
 	"depends": {

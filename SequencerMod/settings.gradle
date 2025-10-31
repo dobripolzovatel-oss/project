@@ -7,4 +7,12 @@ pluginManagement {
 		mavenCentral()
 		gradlePluginPortal()
 	}
+
+	resolutionStrategy {
+		eachPlugin {
+			if (requested.id.id == "io.freefair.aspectj") {
+				useModule("io.freefair.gradle:aspectj-plugin:${requested.version}")
+			}
+		}
+	}
 }

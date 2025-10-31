@@ -482,27 +482,11 @@ public class SequencerMainScreen extends Screen {
         flippedXForAEC = false;
 
 // ЗАМЕНА ВЕСЬ БЛОК if (isAEC) { ... } else { ... } НА ЭТО:
-        if (e instanceof net.minecraft.entity.AreaEffectCloudEntity aec) {
-            try {
-                currentPreset.applyToEntity(aec, custom);
-                seq.sequencermod.client.preview.ManualAECPreviewRenderer.render(
-                        matrices,
-                        immediate,
-                        aec,
-                        mc.getTickDelta(),
-                        currentPreset.previewStyle(custom)
-                );
-            } catch (Throwable t) {
-                AecPreviewProbe.out("drawEntityAny AEC fallback: %s", String.valueOf(t));
-                // Ничего не рендерим здесь — fallback-оверлей будет позже в 2D ветке (если надо)
-            }
-        } else {
-            try {
-                dispatcher.render(e, 0.0, 0.0, 0.0, 0.0F, mc.getTickDelta(), matrices, immediate, 0x00F000F0);
-                immediate.draw();
-            } catch (Throwable t) {
-                System.out.println("[SequencerPreview] drawEntityAny: dispatcher.render failed: " + t);
-            }
+        try {
+            dispatcher.render(e, 0.0, 0.0, 0.0, 0.0F, mc.getTickDelta(), matrices, immediate, 0x00F000F0);
+            immediate.draw();
+        } catch (Throwable t) {
+            System.out.println("[SequencerPreview] drawEntityAny: dispatcher.render failed: " + t);
         }
 
 
@@ -613,21 +597,25 @@ public class SequencerMainScreen extends Screen {
         if (cloud == null || sizePx <= 4) return;
 
         // Насильно выключаем «potion sprites» для ИКОНКИ
-        ManualAECPreviewRenderer.Style iconStyle = currentPreset.previewStyle(custom)
-                .toBuilder()
-                .renderPotionSprites(false)   // важно: без спрайтов
+        var s = currentPreset.previewStyle(custom);
+        ManualAECPreviewRenderer.Style iconStyle = ManualAECPreviewRenderer.Style.builder()
+                .name(s.name)
+                .tintOverride(s.tintOverride)
+                .puffCountMul(s.puffCountMul)
+                .edgeWobble(s.edgeWobble)
+                .renderPotionSprites(false)   // важно: для иконки — без спрайтов
                 .renderBaseDisk(true)
                 .renderSoftPuffs(true)
+                .spriteGrid(s.spriteGrid)
+                .spriteDensity(s.spriteDensity)
                 .spriteAlpha(0.90f)
                 .build();
 
+
+
         // Рендерим строго в прямоугольник иконки
-        ManualAECPreviewRenderer.render2DInRect(
-                ctx,
-                left, top, sizePx, sizePx,
-                cloud,
-                mc.getTickDelta(),
-                iconStyle
+        ManualAECPreviewRenderer.renderOffscreenAndBlit(
+                ctx, left, top, sizePx, sizePx, cloud, mc.getTickDelta(), iconStyle
         );
 
         // Вернём визуальный маркер
@@ -2486,12 +2474,9 @@ public class SequencerMainScreen extends Screen {
                     currentPreset.applyToEntity(cloud, custom);
                     AecPreviewProbe.out("PREVIEW AEC (forced): rect=%d,%d %dx%d", morphPrevLeft, morphPrevTop, pw, ph);
                     try {
-                        ManualAECPreviewRenderer.render2DInRect(
-                                ctx,
-                                morphPrevLeft, morphPrevTop, pw, ph,
-                                cloud,
-                                mc.getTickDelta(),
-                                currentPreset.previewStyle(custom)
+                        ManualAECPreviewRenderer.renderOffscreenAndBlit(
+                                ctx, morphPrevLeft, morphPrevTop, pw, ph,
+                                cloud, mc.getTickDelta(), currentPreset.previewStyle(custom)
                         );
                     } catch (Throwable t) {
                         // Фолбэк: мягкий 2D-оверлей круга по радиусу — не даём экрану упасть
@@ -2542,7 +2527,7 @@ public class SequencerMainScreen extends Screen {
                         AecPreviewProbe.style("PREVIEW AEC: style", currentPreset.previewStyle(custom));
                         AecPreviewProbe.gl("PREVIEW AEC: gl-before");
 
-                        seq.sequencermod.client.preview.ManualAECPreviewRenderer.render2DInRect(
+                        ManualAECPreviewRenderer.renderOffscreenAndBlit(
                                 ctx,
                                 morphPrevLeft, morphPrevTop, pw, ph,
                                 cloud,

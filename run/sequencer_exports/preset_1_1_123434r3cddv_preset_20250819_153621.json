@@ -1,0 +1,94 @@
+{
+  "type": "sequencer_preset",
+  "name": "preset_1_1_123434r3cddv",
+  "steps": [
+    {
+      "entityId": "minecraft:bee",
+      "ticks": 6
+    },
+    {
+      "entityId": "minecraft:bee",
+      "ticks": 6
+    },
+    {
+      "entityId": "minecraft:axolotl",
+      "ticks": 6
+    },
+    {
+      "entityId": "minecraft:bee",
+      "ticks": 6
+    },
+    {
+      "entityId": "minecraft:axolotl",
+      "ticks": 129983
+    },
+    {
+      "entityId": "minecraft:axolotl",
+      "ticks": 456789
+    },
+    {
+      "entityId": "minecraft:armor_stand",
+      "ticks": 6
+    },
+    {
+      "entityId": "minecraft:bee",
+      "ticks": 6
+    },
+    {
+      "entityId": "minecraft:bee",
+      "ticks": 6
+    },
+    {
+      "entityId": "minecraft:axolotl",
+      "ticks": 6
+    },
+    {
+      "entityId": "minecraft:axolotl",
+      "ticks": 6
+    },
+    {
+      "entityId": "minecraft:bee",
+      "ticks": 6
+    },
+    {
+      "entityId": "minecraft:bee",
+      "ticks": 6
+    },
+    {
+      "entityId": "minecraft:axolotl",
+      "ticks": 6
+    },
+    {
+      "entityId": "minecraft:bee",
+      "ticks": 6
+    },
+    {
+      "entityId": "minecraft:bee",
+      "ticks": 6
+    },
+    {
+      "entityId": "minecraft:bee",
+      "ticks": 6
+    },
+    {
+      "entityId": "minecraft:axolotl",
+      "ticks": 12
+    },
+    {
+      "entityId": "minecraft:bee",
+      "ticks": 60
+    },
+    {
+      "entityId": "minecraft:axolotl",
+      "ticks": 12
+    },
+    {
+      "entityId": "minecraft:axolotl",
+      "ticks": 6
+    },
+    {
+      "entityId": "minecraft:bee",
+      "ticks": 6
+    }
+  ]
+}

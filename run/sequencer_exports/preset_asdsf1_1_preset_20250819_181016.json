@@ -1,0 +1,22 @@
+{
+  "type": "sequencer_preset",
+  "name": "preset_asdsf1_1",
+  "steps": [
+    {
+      "entityId": "minecraft:arrow",
+      "ticks": 60
+    },
+    {
+      "entityId": "minecraft:arrow",
+      "ticks": 60
+    },
+    {
+      "entityId": "minecraft:arrow",
+      "ticks": 60
+    },
+    {
+      "entityId": "minecraft:arrow",
+      "ticks": 60
+    }
+  ]
+}

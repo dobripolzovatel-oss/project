@@ -1,0 +1,9 @@
+{
+  "steps": [
+    { "type": "morph", "id": "minecraft:allay" },
+    { "type": "delay", "ticks": 40 },
+    { "type": "unmorph" },
+    { "type": "play_sound", "id": "minecraft:entity.experience_orb.pickup", "volume": 0.8, "pitch": 1.2 },
+    { "type": "particle", "id": "minecraft:happy_villager", "count": 20, "offset": { "x": 0.3, "y": 1.0, "z": 0.3 }, "speed": 0.0 }
+  ]
+}

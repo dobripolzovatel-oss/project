@@ -1,0 +1,162 @@
+{
+  "type": "sequencer_preset",
+  "name": "preset_1_1212huihui",
+  "steps": [
+    {
+      "entityId": "minecraft:axolotl",
+      "ticks": 60
+    },
+    {
+      "entityId": "minecraft:axolotl",
+      "ticks": 120
+    },
+    {
+      "entityId": "minecraft:armor_stand",
+      "ticks": 60
+    },
+    {
+      "entityId": "minecraft:armor_stand",
+      "ticks": 80
+    },
+    {
+      "entityId": "minecraft:axolotl",
+      "ticks": 70
+    },
+    {
+      "entityId": "minecraft:armor_stand",
+      "ticks": 80
+    },
+    {
+      "entityId": "minecraft:armor_stand",
+      "ticks": 80
+    },
+    {
+      "entityId": "minecraft:armor_stand",
+      "ticks": 60
+    },
+    {
+      "entityId": "minecraft:axolotl",
+      "ticks": 60
+    },
+    {
+      "entityId": "minecraft:axolotl",
+      "ticks": 60
+    },
+    {
+      "entityId": "minecraft:axolotl",
+      "ticks": 60
+    },
+    {
+      "entityId": "minecraft:armor_stand",
+      "ticks": 60
+    },
+    {
+      "entityId": "minecraft:axolotl",
+      "ticks": 70
+    },
+    {
+      "entityId": "minecraft:armor_stand",
+      "ticks": 80
+    },
+    {
+      "entityId": "minecraft:armor_stand",
+      "ticks": 80
+    },
+    {
+      "entityId": "minecraft:armor_stand",
+      "ticks": 80
+    },
+    {
+      "entityId": "minecraft:armor_stand",
+      "ticks": 70
+    },
+    {
+      "entityId": "minecraft:armor_stand",
+      "ticks": 60
+    },
+    {
+      "entityId": "minecraft:axolotl",
+      "ticks": 60
+    },
+    {
+      "entityId": "minecraft:axolotl",
+      "ticks": 60
+    },
+    {
+      "entityId": "minecraft:armor_stand",
+      "ticks": 70
+    },
+    {
+      "entityId": "minecraft:axolotl",
+      "ticks": 60
+    },
+    {
+      "entityId": "minecraft:axolotl",
+      "ticks": 70
+    },
+    {
+      "entityId": "minecraft:armor_stand",
+      "ticks": 80
+    },
+    {
+      "entityId": "minecraft:armor_stand",
+      "ticks": 80
+    },
+    {
+      "entityId": "minecraft:armor_stand",
+      "ticks": 80
+    },
+    {
+      "entityId": "minecraft:axolotl",
+      "ticks": 70
+    },
+    {
+      "entityId": "minecraft:armor_stand",
+      "ticks": 80
+    },
+    {
+      "entityId": "minecraft:armor_stand",
+      "ticks": 80
+    },
+    {
+      "entityId": "minecraft:armor_stand",
+      "ticks": 80
+    },
+    {
+      "entityId": "minecraft:armor_stand",
+      "ticks": 80
+    },
+    {
+      "entityId": "minecraft:axolotl",
+      "ticks": 70
+    },
+    {
+      "entityId": "minecraft:armor_stand",
+      "ticks": 80
+    },
+    {
+      "entityId": "minecraft:armor_stand",
+      "ticks": 80
+    },
+    {
+      "entityId": "minecraft:axolotl",
+      "ticks": 70
+    },
+    {
+      "entityId": "minecraft:armor_stand",
+      "ticks": 80
+    },
+    {
+      "entityId": "minecraft:armor_stand",
+      "ticks": 80
+    },
+    {
+      "entityId": "minecraft:armor_stand",
+      "ticks": 80
+    },
+    {
+      "entityId": "minecraft:armor_stand",
+      "ticks": 80
+    }
+  ]
+}

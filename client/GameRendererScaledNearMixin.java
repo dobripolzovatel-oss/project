@@ -19,13 +19,6 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
 import seq.sequencermod.render.RenderPassFlags;
 import seq.sequencermod.size.util.SizeCalc;
 
-/**
- * Ультра-микро адаптация near/far:
- * - сверхмалый near в обычном кадре (вплоть до ~0.0010..0.0015),
- * - при прямом касании грани на 1 кадр поднимаем near до 0.035..0.050,
- * - far жёстко ограничиваем в контакте для устойчивой глубины.
- * FOV-компенсация по-прежнему НЕ касается рендера руки (hand pass).
- */
 @Environment(EnvType.CLIENT)
 @Mixin(GameRenderer.class)
 public abstract class GameRendererScaledNearMixin {
@@ -33,27 +26,26 @@ public abstract class GameRendererScaledNearMixin {
     @Shadow private Camera camera;
 
     private static float minNearForScale(float s) {
-        // Уточнённый минимум near под экстремальные масштабы
-        if (s < 1.0e-5f) return 0.0010f; // ultra-ultra-tiny
-        if (s < 1.0e-4f) return 0.0015f; // ultra-tiny
+        if (s < 1.0e-5f) return 0.0010f;
+        if (s < 1.0e-4f) return 0.0015f;
         if (s < 5.0e-4f) return 0.0020f;
-        if (s < 1.0e-3f) return 0.0025f; // micro
+        if (s < 1.0e-3f) return 0.0025f;
         if (s < 1.0e-2f) return 0.0045f;
         if (s < 0.10f)    return 0.0080f;
         return 0.0100f;
     }
 
+    // ВАЖНО: больше НЕ урезаем far в зависимости от near (no-op).
     private static float limitFarForNear(float far, float near) {
-        // Чем выше near в контакте — тем меньше допускаем far на кадр
-        if (near >= 0.0500f) return Math.min(far, 48.0f);
-        if (near >= 0.0350f) return Math.min(far, 64.0f);
-        if (near >= 0.0250f) return Math.min(far, 96.0f);
-        if (near >= 0.0180f) return Math.min(far, 128.0f);
-        if (near <  0.0030f) return Math.min(far, 96.0f);   // очень малый near — тоже поджимаем
-        if (near <  0.0045f) return Math.min(far, 128.0f);
-        if (near <  0.0085f) return Math.min(far, 768.0f);
-        if (near <  0.0120f) return Math.min(far, 1024.0f);
         return far;
+    }
+
+    private static float minFarForViewDistance(MinecraftClient mc, float fallback) {
+        int chunks = (mc.options != null && mc.options.getViewDistance() != null)
+                ? mc.options.getViewDistance().getValue()
+                : 12;
+        // Безопасный минимум под видимую дистанцию мира
+        return Math.max(fallback, Math.max(512f, chunks * 16f * 2.5f));
     }
 
     @Inject(method = "getBasicProjectionMatrix(D)Lorg/joml/Matrix4f;", at = @At("HEAD"), cancellable = true)
@@ -63,7 +55,6 @@ public abstract class GameRendererScaledNearMixin {
 
         final float vanillaNear = 0.05f;
 
-        // Масштаб игрока
         float s = 1.0f;
         PlayerEntity p = mc.player;
         if (p != null) {
@@ -91,7 +82,7 @@ public abstract class GameRendererScaledNearMixin {
             float minNear = minNearForScale(s);
             near = Math.max(minNear, Math.min(vanillaNear, candidate));
 
-            // Контакт-адаптация near (позиция КАМЕРЫ)
+            // Контакт-адаптация near по положению камеры
             Vec3d camPos = (this.camera != null ? this.camera.getPos() : p.getEyePos());
             BlockPos bp = BlockPos.ofFloored(camPos);
             BlockState st = p.getWorld().getBlockState(bp);
@@ -105,8 +96,7 @@ public abstract class GameRendererScaledNearMixin {
                 double dz = Math.min(fz, 1.0 - fz);
                 double minEdge = Math.min(dx, Math.min(dy, dz));
 
-                // Для экстремально маленьких масштабов поднимаем near сильнее в момент касания
-                if (minEdge < 0.00010) {                          // практически в грани
+                if (minEdge < 0.00010) {
                     near = Math.max(near, firstPerson ? 0.050f : 0.055f);
                 } else if (minEdge < 0.00030) {
                     near = Math.max(near, firstPerson ? 0.040f : 0.045f);
@@ -121,11 +111,15 @@ public abstract class GameRendererScaledNearMixin {
                 }
             }
 
-            // Поддерживаем устойчивую глубину
-            far = limitFarForNear(far, near);
+            // РАНЬШЕ: far = limitFarForNear(far, near);  (урезало far)
+            // ТЕПЕРЬ: только гарантируем нижнюю границу far под дистанцию прорисовки
+            far = minFarForViewDistance(mc, far);
+        } else {
+            // На всякий случай и без игрока тоже держим адекватный минимум
+            far = minFarForViewDistance(mc, far);
         }
 
-        // Матрица проекции
+        // Проекция
         int fbw = mc.getWindow().getFramebufferWidth();
         int fbh = mc.getWindow().getFramebufferHeight();
         float aspect = (fbw > 0 && fbh > 0) ? (float) fbw / (float) fbh : 1.0f;
